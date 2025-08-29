@@ -1,0 +1,46 @@
+{
+  "name": "floorplan-pro",
+  "version": "1.0.0",
+  "description": "Interactive CAD Floor Design System with Virtual Tours and Smart Space Management",
+  "main": "server.js",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "echo 'No build step required'",
+    "test": "echo 'No tests specified'"
+  },
+  "keywords": [
+    "cad",
+    "floor-plan",
+    "3d-viewer",
+    "virtual-tour",
+    "space-management",
+    "architecture",
+    "design"
+  ],
+  "author": "FloorPlan Pro Team",
+  "license": "MIT",
+  "dependencies": {
+    "@aps_sdk/authentication": "^1.0.0",
+    "@aps_sdk/autodesk-sdkmanager": "^1.0.0",
+    "@aps_sdk/model-derivative": "^1.2.0",
+    "@aps_sdk/oss": "^1.2.2",
+    "axios": "^1.11.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^4.18.2",
+    "multer": "^2.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rehmanul/-FloorPlan-Pro-DeDe-.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rehmanul/-FloorPlan-Pro-DeDe-/issues"
+  },
+  "homepage": "https://github.com/rehmanul/-FloorPlan-Pro-DeDe-#readme"
+}
