@@ -1,15 +1,19 @@
 // Autodesk API Design Data Extractor - Real design data extraction
-const { AuthClientTwoLegged, DerivativesApi, ModelDerivativeClient } = require('forge-apis');
+// Using axios for API calls instead of forge-apis for compatibility
+const axios = require('axios');
 
 class AutodeskDesignExtractor {
     constructor() {
-        this.authClient = new AuthClientTwoLegged(
-            process.env.APS_CLIENT_ID,
-            process.env.APS_CLIENT_SECRET,
-            ['data:read', 'viewables:read'],
-            true
+        this.clientId = process.env.APS_CLIENT_ID;
+        this.clientSecret = process.env.APS_CLIENT_SECRET;
+    }
+
+    async getToken() {
+        const response = await axios.post('https://developer.api.autodesk.com/authentication/v2/token', 
+            `client_id=${this.clientId}&client_secret=${this.clientSecret}&grant_type=client_credentials&scope=data:read viewables:read`,
+            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
         );
-        this.derivativesApi = new DerivativesApi(undefined, this.authClient);
+        return response.data.access_token;
     }
 
     // Extract complete design data from Autodesk model

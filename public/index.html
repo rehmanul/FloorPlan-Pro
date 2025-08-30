@@ -305,6 +305,7 @@
                     throw new Error(`Server error: ${errorData.error || jobResponse.statusText}`);
                 }
                 const job = await jobResponse.json();
+                console.log('Upload complete, URN:', job.urn);
                 
                 updateStatus('Processing on Server', 'Your file is being translated...');
                 await pollForCompletion(job.urn);
@@ -333,6 +334,7 @@
                         if (!statusResponse.ok) throw new Error(`Status check failed: ${statusResponse.statusText}`);
                         
                         const data = await statusResponse.json();
+                        console.log('Translation status:', data);
                         
                         let progressMessage = `(Attempt ${attempts}/${maxAttempts})`;
                         if (data.progress && data.progress !== 'complete') {
@@ -340,10 +342,13 @@
                         }
                         updateStatus('Processing on Server', progressMessage);
 
-                        if (data.status === 'success') {
+                        // Check if translation is complete
+                        if (data.status === 'success' || 
+                            (data.derivatives && data.derivatives.some(d => d.status === 'success'))) {
                             clearInterval(interval);
                             resolve();
-                        } else if (data.status === 'failed') {
+                        } else if (data.status === 'failed' || 
+                                 (data.derivatives && data.derivatives.some(d => d.status === 'failed'))) {
                             clearInterval(interval);
                             const errorMsg = data.derivatives?.[0]?.messages?.[0]?.message || 'Unknown processing error.';
                             reject(new Error(`Translation failed: ${errorMsg}`));
@@ -364,34 +369,66 @@
         }
 
         function initializeViewer(urn) {
+            console.log('Initializing viewer with URN:', urn);
             const options = { env: 'AutodeskProduction', getAccessToken };
             if (viewer) { viewer.finish(); viewer = null; }
 
             Autodesk.Viewing.Initializer(options, () => {
+                console.log('Viewer initialized, creating GuiViewer3D');
                 viewer = new Autodesk.Viewing.GuiViewer3D(document.getElementById('forgeViewer'));
                 viewer.start();
                 const documentId = 'urn:' + urn;
+                console.log('Loading document:', documentId);
                 Autodesk.Viewing.Document.load(documentId, onDocumentLoadSuccess, onDocumentLoadFailure);
             });
         }
 
         function onDocumentLoadSuccess(doc) {
-            const viewables = doc.getRoot().getDefaultGeometry();
-            if (!viewables) {
+            console.log('Document loaded successfully');
+            
+            // Try to get 2D viewables first (for DXF files)
+            let viewables = doc.getRoot().search({'type': 'geometry', 'role': '2d'});
+            
+            // If no 2D viewables, try 3D
+            if (!viewables || viewables.length === 0) {
+                viewables = doc.getRoot().getDefaultGeometry();
+            }
+            
+            // If still no viewables, try any geometry
+            if (!viewables || viewables.length === 0) {
+                viewables = doc.getRoot().search({'type': 'geometry'});
+            }
+            
+            if (!viewables || viewables.length === 0) {
+                console.error('No viewables found in document');
                 onDocumentLoadFailure('no-viewables', 'Document does not contain any viewable geometry.');
                 return;
             }
-            viewer.loadDocumentNode(doc, viewables).then(() => {
+            
+            console.log('Found viewables:', viewables.length);
+            const viewable = Array.isArray(viewables) ? viewables[0] : viewables;
+            console.log('Loading viewable:', viewable);
+            
+            viewer.loadDocumentNode(doc, viewable).then(() => {
+                console.log('Viewer loaded successfully');
                 document.getElementById('statusOverlay').classList.add('hidden');
                 floorAnalyzer = new FloorAnalyzer(viewer);
                 designManager = new DesignManager(viewer, floorAnalyzer);
                 showNotification('Model loaded successfully!', 'success');
-            }).catch(err => onDocumentLoadFailure('load_node_error', err.message));
+                
+                // Fit to view after loading
+                setTimeout(() => {
+                    viewer.fitToView();
+                }, 1000);
+            }).catch(err => {
+                console.error('Failed to load document node:', err);
+                onDocumentLoadFailure('load_node_error', err.message);
+            });
         }
 
         function onDocumentLoadFailure(code, message) {
-            console.error('Loading failed:', code, message);
-            updateStatus('Error loading model', `Could not load the model. Code: ${code}`, true);
+            console.error('Document loading failed:', code, message);
+            updateStatus('Error loading model', `Could not load the model. Code: ${code} - ${message}`, true);
         }
 
         function setupSidebarToggles() {
