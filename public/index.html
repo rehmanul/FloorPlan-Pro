@@ -4,1118 +4,331 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FloorPlan Pro - Real CAD Analysis Engine</title>
-    <!-- Autodesk Viewer CSS -->
     <link rel="stylesheet" href="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/style.min.css" type="text/css" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
     <style>
         :root {
             --primary: #2563eb; --primary-dark: #1d4ed8; --secondary: #64748b;
             --success: #10b981; --warning: #f59e0b; --danger: #ef4444;
-            --bg-primary: #0f172a; --bg-secondary: #1e293b; --bg-tertiary: #334155;
+            --bg-primary: #f8fafc; --bg-secondary: #eef2f9; --bg-tertiary: #e2e8f0;
             --surface: #ffffff; --text-primary: #1e293b; --text-secondary: #64748b;
             --text-light: #94a3b8; --border: #e2e8f0;
         }
-        body { font-family: 'Inter', sans-serif; background: #f8fafc; color: var(--text-primary); line-height: 1.6; margin: 0; }
-        .app-container { display: grid; grid-template-columns: 1fr; height: 100vh; }
-        .main-content { display: flex; flex-direction: column; height: 100vh; }
-        .header { background: white; padding: 1rem 2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.6; margin: 0; overflow: hidden; }
+        .app-container { display: grid; grid-template-columns: 300px 1fr 350px; height: 100vh; transition: grid-template-columns 0.3s ease; }
+        .sidebar { background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; display: flex; flex-direction: column; transition: width 0.3s ease, opacity 0.3s ease; }
+        .sidebar-right { border-right: none; border-left: 1px solid var(--border); }
+        .sidebar.collapsed { width: 0; opacity: 0; padding: 0; margin: 0; border: none; }
+        .main-content { display: flex; flex-direction: column; height: 100vh; background: var(--bg-secondary); position: relative; }
+        .sidebar-toggle { position: absolute; top: 50%; transform: translateY(-50%); background: var(--primary); color: white; border: none; width: 24px; height: 48px; cursor: pointer; z-index: 1001; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+        #left-sidebar-toggle { left: 0; border-radius: 0 6px 6px 0; }
+        #right-sidebar-toggle { right: 0; border-radius: 6px 0 0 6px; }
+        .header { background: var(--surface); padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
         .header-left { display: flex; align-items: center; gap: 1rem; }
-        .logo { font-size: 1.5rem; font-weight: 800; }
-        .upload-btn { padding: 0.75rem 1.5rem; border-radius: 0.5rem; border: none; font-weight: 600; cursor: pointer; background: var(--primary); color: white; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .logo { font-size: 1.5rem; font-weight: 800; color: var(--primary); }
+        .upload-btn { padding: 0.6rem 1.2rem; border-radius: 0.5rem; border: none; font-weight: 600; cursor: pointer; background: var(--primary); color: white; display: inline-flex; align-items: center; gap: 0.5rem; transition: background-color 0.2s; }
+        .upload-btn:hover { background: var(--primary-dark); }
+        .header-center { display: flex; gap: 0.5rem; }
+        .header-btn { background: none; border: 1px solid var(--border); color: var(--text-secondary); padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; }
+        .header-btn.active, .header-btn:hover { background: var(--bg-secondary); color: var(--primary); }
+        .header-btn[disabled] { cursor: not-allowed; opacity: 0.5; }
         .content { flex-grow: 1; position: relative; }
-        #viewer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        .status-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; z-index: 10; }
+        #forgeViewer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .sidebar-panel { margin: 1rem; background: white; border-radius: 8px; border: 1px solid var(--border); }
+        .panel-header { padding: 1rem; border-bottom: 1px solid var(--border); font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        .panel-content { padding: 1rem; }
+        .btn { padding: 0.6rem 1rem; border-radius: 6px; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; width: 100%; justify-content: center; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-secondary { background: var(--bg-tertiary); color: var(--text-primary); }
+        .section { margin-bottom: 1.5rem; }
+        .section h4 { margin: 0 0 0.75rem 0; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+        .list-container { max-height: 200px; overflow-y: auto; }
+        .list-item { padding: 0.75rem; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 0.5rem; cursor: pointer; }
+        .list-item:hover { background: var(--bg-secondary); }
+        .detail-group { margin-bottom: 0.75rem; }
+        .detail-group label { display: block; font-weight: 600; margin-bottom: 0.25rem; font-size: 0.875rem; }
+        .detail-value { font-size: 1rem; color: var(--text-primary); }
         .hidden { display: none; }
-        
-        /* Navigation Panel Styles */
-        .navigation-panel { position: fixed; top: 80px; right: 20px; width: 300px; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; }
-        .nav-header { padding: 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--primary); color: white; border-radius: 8px 8px 0 0; }
-        .nav-header h3 { margin: 0; font-size: 1rem; }
-        .nav-content { padding: 1rem; max-height: 500px; overflow-y: auto; }
-        .nav-section { margin-bottom: 1rem; }
-        .nav-section label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary); }
-        .nav-section select, .nav-section input { width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; }
-        .btn-primary { background: var(--primary); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; }
-        .btn-secondary { background: var(--secondary); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
-        .btn-icon { background: none; border: none; color: white; cursor: pointer; }
-        .room-list { max-height: 150px; overflow-y: auto; }
-        .room-button { width: 100%; text-align: left; padding: 0.5rem; border: 1px solid var(--border); background: white; margin-bottom: 0.25rem; border-radius: 4px; cursor: pointer; }
-        .room-button:hover { background: #f8fafc; }
-        .location-info { padding: 0.5rem; background: #f8fafc; border-radius: 4px; font-weight: 600; }
-        
-        /* Ilots Panel Styles */
-        .ilots-panel { position: fixed; top: 80px; left: 20px; width: 280px; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; }
-        .ilots-header { padding: 1rem; border-bottom: 1px solid var(--border); background: var(--success); color: white; border-radius: 8px 8px 0 0; }
-        .ilots-content { padding: 1rem; max-height: 400px; overflow-y: auto; }
-        .ilot-item { padding: 0.75rem; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 0.5rem; cursor: pointer; }
-        .ilot-item:hover { background: #f8fafc; }
-        .ilot-type { font-weight: 600; color: var(--primary); }
-        .ilot-details { font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem; }
-        
-        /* Notifications */
-        .notification { position: fixed; top: 20px; right: 20px; padding: 1rem; border-radius: 4px; color: white; z-index: 2000; display: flex; align-items: center; gap: 0.5rem; }
+        .status-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; z-index: 10; }
+        .notification { position: fixed; bottom: 20px; right: 20px; padding: 1rem; border-radius: 4px; color: white; z-index: 2000; display: flex; align-items: center; gap: 0.5rem; }
         .notification-success { background: var(--success); }
         .notification-error { background: var(--danger); }
         .notification-warning { background: var(--warning); }
-        .notification-info { background: var(--primary); }
-        
-        /* Tooltip */
-        .tooltip-3d { position: absolute; background: rgba(0,0,0,0.8); color: white; padding: 0.5rem; border-radius: 4px; font-size: 0.875rem; z-index: 1500; pointer-events: none; }
-        
-        /* Controls */
-        .controls-panel { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; gap: 1rem; z-index: 1000; }
-        .control-group { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; }
-        .control-btn { padding: 0.5rem; border: 1px solid var(--border); background: white; border-radius: 4px; cursor: pointer; }
-        .control-btn:hover { background: #f8fafc; }
-        .control-label { font-size: 0.75rem; color: var(--text-secondary); }
-        
-        /* Design Properties Panel */
-        .design-properties-panel { position: fixed; top: 80px; right: 320px; width: 350px; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; max-height: 80vh; overflow-y: auto; }
-        .panel-header { padding: 1rem; border-bottom: 1px solid var(--border); background: var(--warning); color: white; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center; }
-        .panel-content { padding: 1rem; }
-        .section { margin-bottom: 1.5rem; }
-        .section h4 { margin: 0 0 0.5rem 0; color: var(--primary); }
-        .detail-group { margin-bottom: 0.75rem; }
-        .detail-group label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
-        .detail-group input, .detail-group select { width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 0.25rem; }
-        .detail-group input[type="number"] { width: calc(33% - 0.25rem); display: inline-block; margin-right: 0.25rem; }
-        .detail-group input[type="color"] { width: 60px; height: 40px; }
-        .elements-list { max-height: 200px; overflow-y: auto; }
-        .element-item { padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 0.25rem; display: flex; justify-content: space-between; align-items: center; }
-        .element-item:hover { background: #f8fafc; }
-        .btn-success { background: var(--success); color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem; }
     </style>
 </head>
 <body>
-    <div class="app-container">
+    <div id="appContainer" class="app-container">
+        <!-- Left Sidebar -->
+        <aside id="leftSidebar" class="sidebar sidebar-left">
+            <div class="sidebar-panel">
+                <div class="panel-header"><h4><i class="fas fa-tools"></i> Tools</h4></div>
+                <div class="panel-content">
+                    <div class="section">
+                        <button id="generateCorridorsBtn" class="btn btn-primary"><i class="fas fa-magic"></i> Generate Corridors</button>
+                    </div>
+                     <div class="section">
+                        <button id="generateIlotsBtn" class="btn btn-primary"><i class="fas fa-th-large"></i> Generate Ilots</button>
+                    </div>
+                    <div class="section">
+                        <h4>Assets ("Ilots")</h4>
+                        <div id="ilotsList" class="list-container">
+                            <p class="text-secondary">No ilots generated.</p>
+                        </div>
+                    </div>
+                    <div class="section">
+                        <h4>Export</h4>
+                        <button id="exportPlanBtn" class="btn btn-secondary"><i class="fas fa-file-export"></i> Export Plan</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
         <main class="main-content">
+            <button id="left-sidebar-toggle" class="sidebar-toggle"><i class="fas fa-chevron-left"></i></button>
+            <button id="right-sidebar-toggle" class="sidebar-toggle"><i class="fas fa-chevron-right"></i></button>
             <header class="header">
                 <div class="header-left">
                     <div class="logo"><i class="fas fa-cube"></i> FloorPlan Pro</div>
                 </div>
+                <div class="header-center">
+                    <button id="walkthrough3dBtn" class="header-btn"><i class="fas fa-walking"></i> 3D Walkthrough</button>
+                    <button class="header-btn" disabled>4D</button>
+                    <button class="header-btn" disabled>5D</button>
+                    <button class="header-btn" disabled>6D</button>
+                    <button class="header-btn" disabled>7D</button>
+                    <button class="header-btn" disabled>8D</button>
+                </div>
                 <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
-                    <i class="fas fa-upload"></i> Upload New File
+                    <i class="fas fa-upload"></i> Upload File
                 </button>
                 <input type="file" id="fileInput" accept=".dxf,.dwg,.rvt,.ifc,.step,.stp" class="hidden" />
             </header>
             <div class="content">
-                <div id="viewer">
+                <div id="forgeViewer">
                     <div id="statusOverlay" class="status-overlay">
-                        <div id="statusText" style="font-size: 1.2rem; font-weight: 600;">Welcome to FloorPlan Pro</div>
+                         <div id="statusText" style="font-size: 1.2rem; font-weight: 600;">Welcome to FloorPlan Pro</div>
                         <div id="statusSubText" style="font-size: 0.9rem; opacity: 0.8;">Upload a CAD file to begin.</div>
-                        <button id="skipProcessing" class="btn-secondary" style="margin-top: 1rem; display: none;" onclick="skipToViewer()">Skip Processing & Continue</button>
                     </div>
                 </div>
             </div>
         </main>
+
+        <!-- Right Sidebar -->
+        <aside id="rightSidebar" class="sidebar sidebar-right">
+            <div class="sidebar-panel">
+                <div class="panel-header"><h4><i class="fas fa-ruler-combined"></i> Floor Plan Details</h4></div>
+                <div class="panel-content">
+                    <div class="section">
+                        <h4>Measurements</h4>
+                        <div class="detail-group">
+                            <label>Total Area</label>
+                            <p id="totalArea" class="detail-value">0 m²</p>
+                        </div>
+                        <div class="detail-group">
+                            <label>Rooms</label>
+                            <div id="roomList" class="list-container">
+                                <p class="text-secondary">No rooms analyzed.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="section">
+                        <h4>Properties Inspector</h4>
+                        <div id="propertiesInspector">
+                            <p class="text-secondary">Select an object to see its properties.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
     </div>
 
-    <!-- Autodesk Viewer JavaScript -->
     <script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/viewer3D.min.js"></script>
-    
-    <!-- Floor Analyzer and Navigation Scripts -->
     <script>
-        // Floor Design Analyzer - Extract spatial data and manage ilots
+        // --- GLOBALS ---
+        let viewer, floorAnalyzer, designManager;
+
+        // --- CLASSES ---
         class FloorAnalyzer {
-            constructor(viewer) {
-                this.viewer = viewer;
-                this.rooms = [];
-                this.corridors = [];
-                this.ilots = [];
-                this.navigationPaths = [];
-                this.currentPath = null;
-            }
-
+            constructor(viewer) { this.viewer = viewer; this.rooms = []; this.corridors = []; this.ilots = []; }
             async analyzeFloorPlan() {
-                if (!this.viewer || !this.viewer.model) {
-                    console.warn('Viewer or model not available, using mock data');
-                    this.createMockData();
-                    return { rooms: this.rooms, corridors: this.corridors, ilots: this.ilots, paths: this.navigationPaths };
-                }
-                
-                const model = this.viewer.model;
-                const instanceTree = model.getInstanceTree();
-                
-                if (!instanceTree) {
-                    console.warn('Instance tree not available, using mock data');
-                    this.createMockData();
-                    return { rooms: this.rooms, corridors: this.corridors, ilots: this.ilots, paths: this.navigationPaths };
-                }
-                
-                await this.extractRooms(instanceTree);
-                await this.extractCorridors(instanceTree);
-                await this.generateNavigationPaths();
-                
-                // If no rooms found, create mock data for demo
-                if (this.rooms.length === 0) {
-                    this.createMockData();
-                }
-                
-                return { rooms: this.rooms, corridors: this.corridors, ilots: this.ilots, paths: this.navigationPaths };
-            }
-
-            async extractRooms(instanceTree) {
-                this.rooms = [];
-                if (!instanceTree) return;
-                
-                const roomTypes = ['Room', 'Space', 'Area', 'Zone'];
-                
                 try {
-                    instanceTree.enumNodeChildren(instanceTree.getRootId(), (dbId) => {
-                        const name = instanceTree.getNodeName(dbId);
-                        if (roomTypes.some(type => name?.toLowerCase().includes(type.toLowerCase()))) {
-                            this.viewer.model.getBoundingBox(dbId, (bbox) => {
-                                if (bbox && bbox.valid) {
-                                    this.rooms.push({
-                                        id: dbId, name: name || `Room ${dbId}`, bbox: bbox,
-                                        center: bbox.center(), accessible: true, type: this.determineRoomType(name)
-                                    });
-                                }
-                            });
-                        }
-                    }, true);
-                } catch (error) {
-                    console.warn('Error extracting rooms:', error);
-                    // Fallback: create mock rooms for demo
-                    this.createMockRooms();
-                }
-            }
-
-            async extractCorridors(instanceTree) {
-                this.corridors = [];
-                if (!instanceTree) return;
-                
-                const corridorTypes = ['Corridor', 'Hallway', 'Passage', 'Path'];
-                
-                try {
-                    instanceTree.enumNodeChildren(instanceTree.getRootId(), (dbId) => {
-                        const name = instanceTree.getNodeName(dbId);
-                        if (corridorTypes.some(type => name?.toLowerCase().includes(type.toLowerCase()))) {
-                            this.viewer.model.getBoundingBox(dbId, (bbox) => {
-                                if (bbox && bbox.valid) {
-                                    this.corridors.push({
-                                        id: dbId, name: name || `Corridor ${dbId}`, bbox: bbox,
-                                        path: this.generateCorridorPath(bbox), width: this.calculateCorridorWidth(bbox)
-                                    });
-                                }
-                            });
-                        }
-                    }, true);
-                } catch (error) {
-                    console.warn('Error extracting corridors:', error);
-                    // Fallback: create mock corridors for demo
-                    this.createMockCorridors();
-                }
-            }
-
-            placeIlots(config = {}) {
-                const { density = 0.3, minDistance = 2.0, types = ['work', 'meeting', 'social'] } = config;
-                this.ilots = [];
-
-                this.rooms.forEach(room => {
-                    if (room.type === 'office' || room.type === 'open') {
-                        const ilotCount = Math.floor(this.calculateRoomArea(room.bbox) * density / 10);
-                        
-                        for (let i = 0; i < ilotCount; i++) {
-                            const position = this.findOptimalIlotPosition(room, minDistance);
-                            if (position) {
-                                this.ilots.push({
-                                    id: `ilot_${room.id}_${i}`, roomId: room.id, position: position,
-                                    type: types[i % types.length], capacity: this.calculateIlotCapacity(types[i % types.length]),
-                                    accessible: true
-                                });
-                            }
-                        }
-                    }
-                });
-                return this.ilots;
-            }
-
-            generateNavigationPaths() {
-                this.navigationPaths = [];
-                this.rooms.forEach(room => {
-                    const connectedCorridors = this.findConnectedCorridors(room);
-                    connectedCorridors.forEach(corridor => {
-                        const connectedRooms = this.findRoomsConnectedToCorridor(corridor);
-                        connectedRooms.forEach(targetRoom => {
-                            if (targetRoom.id !== room.id) {
-                                this.navigationPaths.push({
-                                    from: room.id, to: targetRoom.id, via: corridor.id,
-                                    path: this.calculatePath(room.center, targetRoom.center, corridor),
-                                    distance: this.calculateDistance(room.center, targetRoom.center)
-                                });
-                            }
-                        });
-                    });
-                });
-            }
-
-            startTour(startRoomId, tourType = 'guided') {
-                const startRoom = this.rooms.find(r => r.id === startRoomId);
-                if (!startRoom) return null;
-
-                const tour = {
-                    id: Date.now(), type: tourType, currentRoom: startRoomId,
-                    visitedRooms: [startRoomId], availablePaths: this.getAvailablePaths(startRoomId),
-                    position: startRoom.center
-                };
-
-                this.currentTour = tour;
-                this.viewer.navigation.setPosition(startRoom.center);
-                return tour;
-            }
-
-            navigateToRoom(targetRoomId) {
-                if (!this.currentTour) return null;
-                const path = this.findShortestPath(this.currentTour.currentRoom, targetRoomId);
-                if (!path) return null;
-
-                this.currentPath = path;
-                this.animateNavigation(path);
-                
-                this.currentTour.currentRoom = targetRoomId;
-                this.currentTour.visitedRooms.push(targetRoomId);
-                this.currentTour.availablePaths = this.getAvailablePaths(targetRoomId);
-                return path;
-            }
-
-            animateNavigation(path) {
-                if (!path || !path.path) return;
-                const duration = 3000, steps = path.path.length;
-                let currentStep = 0;
-
-                const animate = () => {
-                    if (currentStep < steps) {
-                        const position = path.path[currentStep];
-                        this.viewer.navigation.setPosition(position);
-                        currentStep++;
-                        setTimeout(animate, duration / steps);
-                    }
-                };
-                animate();
-            }
-
-            // Helper methods
-            determineRoomType(name) {
-                const lowerName = name?.toLowerCase() || '';
-                if (lowerName.includes('office')) return 'office';
-                if (lowerName.includes('meeting')) return 'meeting';
-                if (lowerName.includes('kitchen')) return 'kitchen';
-                if (lowerName.includes('bathroom')) return 'bathroom';
-                if (lowerName.includes('stair')) return 'stairs';
-                return 'open';
-            }
-
-            calculateRoomArea(bbox) { const size = bbox.size(); return size.x * size.y; }
-            findOptimalIlotPosition(room, minDistance) {
-                const center = room.center, size = room.bbox.size(), offset = Math.min(size.x, size.y) * 0.3;
-                return { x: center.x + (Math.random() - 0.5) * offset, y: center.y + (Math.random() - 0.5) * offset, z: center.z };
-            }
-            calculateIlotCapacity(type) { const capacities = { work: 4, meeting: 8, social: 12 }; return capacities[type] || 4; }
-            findConnectedCorridors(room) { return this.corridors.filter(corridor => this.isRoomConnectedToCorridor(room, corridor)); }
-            isRoomConnectedToCorridor(room, corridor) { return room.bbox.intersects(corridor.bbox) || this.areAdjacent(room.bbox, corridor.bbox); }
-            areAdjacent(bbox1, bbox2, tolerance = 0.5) {
-                const distance = bbox1.center().distanceTo(bbox2.center());
-                const combinedSize = (bbox1.size().length() + bbox2.size().length()) / 2;
-                return distance <= combinedSize + tolerance;
-            }
-            findRoomsConnectedToCorridor(corridor) { return this.rooms.filter(room => this.isRoomConnectedToCorridor(room, corridor)); }
-            calculatePath(start, end, viaCorridor) { const corridorCenter = viaCorridor.bbox.center(); return [start, corridorCenter, end]; }
-            calculateDistance(point1, point2) { return point1.distanceTo(point2); }
-            getAvailablePaths(roomId) { return this.navigationPaths.filter(path => path.from === roomId); }
-            findShortestPath(fromRoomId, toRoomId) { return this.navigationPaths.find(path => path.from === fromRoomId && path.to === toRoomId); }
-            generateCorridorPath(bbox) { const start = bbox.min, end = bbox.max, center = bbox.center(); return [start, center, end]; }
-            calculateCorridorWidth(bbox) { const size = bbox.size(); return Math.min(size.x, size.y); }
-            
-            createMockData() {
-                this.createMockRooms();
-                this.createMockCorridors();
-                this.generateNavigationPaths();
-            }
-            
-            createMockRooms() {
-                this.rooms = [
-                    { id: 1001, name: 'Main Office', type: 'office', accessible: true, 
-                      bbox: { min: {x: 0, y: 0, z: 0}, max: {x: 12, y: 10, z: 3}, center: () => ({x: 6, y: 5, z: 1.5}), valid: true, size: () => ({x: 12, y: 10, z: 3}) } },
-                    { id: 1002, name: 'Meeting Room A', type: 'meeting', accessible: true,
-                      bbox: { min: {x: 15, y: 0, z: 0}, max: {x: 20, y: 9, z: 3}, center: () => ({x: 17.5, y: 4.5, z: 1.5}), valid: true, size: () => ({x: 5, y: 9, z: 3}) } },
-                    { id: 1003, name: 'Kitchen', type: 'kitchen', accessible: true,
-                      bbox: { min: {x: 0, y: 12, z: 0}, max: {x: 8, y: 18, z: 3}, center: () => ({x: 4, y: 15, z: 1.5}), valid: true, size: () => ({x: 8, y: 6, z: 3}) } },
-                    { id: 1004, name: 'Reception', type: 'reception', accessible: true,
-                      bbox: { min: {x: 10, y: 12, z: 0}, max: {x: 18, y: 18, z: 3}, center: () => ({x: 14, y: 15, z: 1.5}), valid: true, size: () => ({x: 8, y: 6, z: 3}) } }
-                ];
-            }
-            
-            createMockCorridors() {
-                this.corridors = [
-                    { id: 2001, name: 'Main Corridor', width: 2.5,
-                      bbox: { min: {x: 0, y: 10, z: 0}, max: {x: 25, y: 12, z: 3}, center: () => ({x: 12.5, y: 11, z: 1.5}), valid: true },
-                      path: [{x: 0, y: 11, z: 0}, {x: 12.5, y: 11, z: 0}, {x: 25, y: 11, z: 0}] },
-                    { id: 2002, name: 'Side Passage', width: 1.8,
-                      bbox: { min: {x: 12, y: 0, z: 0}, max: {x: 14, y: 12, z: 3}, center: () => ({x: 13, y: 6, z: 1.5}), valid: true },
-                      path: [{x: 13, y: 0, z: 0}, {x: 13, y: 6, z: 0}, {x: 13, y: 12, z: 0}] }
-                ];
-            }
-        }
-
-        // Navigation Controller
-        class NavigationController {
-            constructor(viewer, floorAnalyzer) {
-                this.viewer = viewer;
-                this.analyzer = floorAnalyzer;
-                this.isNavigating = false;
-                this.currentTour = null;
-                this.navigationSpeed = 1.0;
-                this.viewMode = '3d';
-            }
-
-            initialize() {
-                this.setupNavigationControls();
-                this.setupEventListeners();
-                return this;
-            }
-
-            setupNavigationControls() {
-                const navPanel = this.createNavigationPanel();
-                const ilotsPanel = this.createIlotsPanel();
-                const controlsPanel = this.createControlsPanel();
-                document.body.appendChild(navPanel);
-                document.body.appendChild(ilotsPanel);
-                document.body.appendChild(controlsPanel);
-            }
-
-            createNavigationPanel() {
-                const panel = document.createElement('div');
-                panel.id = 'navigationPanel';
-                panel.className = 'navigation-panel';
-                panel.innerHTML = `
-                    <div class="nav-header">
-                        <h3><i class="fas fa-route"></i> Navigation</h3>
-                        <button id="toggleNav" class="btn-icon"><i class="fas fa-chevron-down"></i></button>
-                    </div>
-                    <div class="nav-content">
-                        <div class="nav-section">
-                            <label>View Mode:</label>
-                            <select id="viewMode">
-                                <option value="3d">3D View</option>
-                                <option value="2d">Floor Plan</option>
-                                <option value="walkthrough">Walkthrough</option>
-                            </select>
-                        </div>
-                        <div class="nav-section">
-                            <button id="analyzeFloor" class="btn-success"><i class="fas fa-search"></i> Analyze Floor</button>
-                        </div>
-                        <div class="nav-section">
-                            <button id="startTour" class="btn-primary"><i class="fas fa-play"></i> Start Tour</button>
-                            <button id="stopTour" class="btn-secondary" disabled><i class="fas fa-stop"></i> Stop</button>
-                        </div>
-                        <div class="nav-section">
-                            <label>Rooms:</label>
-                            <div id="roomList" class="room-list"></div>
-                        </div>
-                        <div class="nav-section">
-                            <label>Current Location:</label>
-                            <div id="currentLocation" class="location-info">Not started</div>
-                        </div>
-                    </div>
-                `;
-                return panel;
-            }
-
-            createIlotsPanel() {
-                const panel = document.createElement('div');
-                panel.id = 'ilotsPanel';
-                panel.className = 'ilots-panel';
-                panel.innerHTML = `
-                    <div class="ilots-header">
-                        <h3><i class="fas fa-th-large"></i> Ilots Management</h3>
-                    </div>
-                    <div class="ilots-content">
-                        <div class="nav-section">
-                            <button id="generateIlots" class="btn-primary"><i class="fas fa-magic"></i> Generate Ilots</button>
-                            <button id="clearIlots" class="btn-secondary"><i class="fas fa-trash"></i> Clear</button>
-                        </div>
-                        <div id="ilotsList" class="ilots-list"></div>
-                    </div>
-                `;
-                return panel;
-            }
-
-            createControlsPanel() {
-                const panel = document.createElement('div');
-                panel.className = 'controls-panel';
-                panel.innerHTML = `
-                    <div class="control-group">
-                        <button class="control-btn" id="moveForward"><i class="fas fa-arrow-up"></i></button>
-                        <span class="control-label">Forward (W)</span>
-                    </div>
-                    <div class="control-group">
-                        <button class="control-btn" id="turnLeft"><i class="fas fa-arrow-left"></i></button>
-                        <span class="control-label">Left (A)</span>
-                    </div>
-                    <div class="control-group">
-                        <button class="control-btn" id="moveBackward"><i class="fas fa-arrow-down"></i></button>
-                        <span class="control-label">Back (S)</span>
-                    </div>
-                    <div class="control-group">
-                        <button class="control-btn" id="turnRight"><i class="fas fa-arrow-right"></i></button>
-                        <span class="control-label">Right (D)</span>
-                    </div>
-                `;
-                return panel;
-            }
-
-            setupEventListeners() {
-                document.getElementById('viewMode')?.addEventListener('change', (e) => this.setViewMode(e.target.value));
-                document.getElementById('analyzeFloor')?.addEventListener('click', () => this.analyzeFloor());
-                document.getElementById('startTour')?.addEventListener('click', () => this.startGuidedTour());
-                document.getElementById('stopTour')?.addEventListener('click', () => this.stopTour());
-                document.getElementById('generateIlots')?.addEventListener('click', () => this.generateIlots());
-                document.getElementById('clearIlots')?.addEventListener('click', () => this.clearIlots());
-                
-                // Movement controls
-                document.getElementById('moveForward')?.addEventListener('click', () => this.moveForward());
-                document.getElementById('moveBackward')?.addEventListener('click', () => this.moveBackward());
-                document.getElementById('turnLeft')?.addEventListener('click', () => this.turnLeft());
-                document.getElementById('turnRight')?.addEventListener('click', () => this.turnRight());
-                
-                document.addEventListener('keydown', (e) => this.handleKeyboardNavigation(e));
-                if (this.viewer && this.viewer.addEventListener) {
-                    this.viewer.addEventListener(Autodesk.Viewing.SELECTION_CHANGED_EVENT, (event) => this.onSelectionChanged(event));
-                }
-            }
-
-            async analyzeFloor() {
-                try {
-                    this.showNotification('Analyzing floor plan...', 'info');
-                    
-                    // Get current URN from viewer
-                    const urn = this.viewer?.model?.getData()?.urn || 'demo-urn';
-                    
-                    // Call backend API
+                    const urn = this.viewer?.model?.getData()?.urn;
+                    if (!urn) { throw new Error("URN not found in viewer model."); }
                     const response = await fetch('/api/analyze', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            urn: urn,
-                            analysisType: 'full'
-                        })
+                        body: JSON.stringify({ urn })
                     });
-                    
-                    if (!response.ok) {
-                        throw new Error(`Server error: ${response.status}`);
-                    }
-                    
+                    if (!response.ok) throw new Error(`Analysis API failed: ${response.statusText}`);
                     const result = await response.json();
-                    
-                    // Update analyzer with server results
-                    this.analyzer.rooms = result.analysis.rooms || [];
-                    this.analyzer.corridors = result.analysis.corridors || [];
-                    this.analyzer.navigationPaths = result.analysis.navigationPaths || [];
-                    
-                    this.populateRoomList();
-                    this.showNotification(`Analysis complete: ${result.analysis.rooms.length} rooms, ${result.analysis.corridors.length} corridors found!`, 'success');
-                    
+                    this.rooms = result.analysis.rooms || [];
+                    this.corridors = result.analysis.corridors || [];
+                    return result.analysis;
                 } catch (error) {
-                    console.error('Failed to analyze floor:', error);
-                    this.showNotification('Analysis failed: ' + error.message, 'error');
-                    
-                    // Fallback to local analysis
-                    await this.analyzer.analyzeFloorPlan();
-                    this.populateRoomList();
-                    this.showNotification('Using local analysis (fallback)', 'warning');
+                    console.error('Floor plan analysis failed:', error);
+                    showNotification('Could not analyze floor plan.', 'error');
+                    return null;
                 }
             }
-
-            async startGuidedTour() {
-                if (!this.analyzer.rooms.length) await this.analyzer.analyzeFloorPlan();
-                if (!this.analyzer.rooms.length) { this.showNotification('No rooms found', 'warning'); return; }
-
-                const startRoom = this.analyzer.rooms[0];
-                this.currentTour = this.analyzer.startTour(startRoom.id, 'guided');
-                
-                if (this.currentTour) {
-                    this.isNavigating = true;
-                    this.populateRoomList();
-                    this.showNotification(`Tour started from ${startRoom.name}`, 'success');
-                    document.getElementById('startTour').disabled = true;
-                    document.getElementById('stopTour').disabled = false;
-                }
-            }
-
-            stopTour() {
-                this.isNavigating = false;
-                this.currentTour = null;
-                document.getElementById('startTour').disabled = false;
-                document.getElementById('stopTour').disabled = true;
-                document.getElementById('currentLocation').textContent = 'Tour stopped';
-                this.showNotification('Tour stopped', 'info');
-            }
-
-            async navigateToRoom(roomId) {
-                if (!this.currentTour) await this.startGuidedTour();
-                const targetRoom = this.analyzer.rooms.find(r => r.id === roomId);
-                if (!targetRoom) { this.showNotification('Room not found', 'error'); return; }
-
-                try {
-                    // Call backend navigation API
-                    const urn = this.viewer?.model?.getData()?.urn || 'demo-urn';
-                    const response = await fetch('/api/navigation', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            urn: urn,
-                            from: this.currentTour.currentRoom,
-                            to: roomId,
-                            mode: 'shortest'
-                        })
-                    });
-                    
-                    if (response.ok) {
-                        const result = await response.json();
-                        this.analyzer.animateNavigation(result.path);
-                        this.showNotification(`Navigating to ${targetRoom.name} (${result.distance.toFixed(1)}m)`, 'info');
-                    } else {
-                        throw new Error('Navigation API failed');
-                    }
-                } catch (error) {
-                    // Fallback to local navigation
-                    const path = this.analyzer.navigateToRoom(roomId);
-                    if (path) {
-                        this.showNotification(`Navigating to ${targetRoom.name}`, 'info');
-                    } else {
-                        this.showNotification(`Cannot find path to ${targetRoom.name}`, 'warning');
-                    }
-                }
-                
-                document.getElementById('currentLocation').textContent = targetRoom.name;
-            }
-
             async generateIlots() {
-                try {
-                    this.showNotification('Generating ilots...', 'info');
-                    
-                    // Get current URN from viewer
-                    const urn = this.viewer?.model?.getData()?.urn || 'demo-urn';
-                    
-                    // Call backend API
+                 try {
+                    const urn = this.viewer?.model?.getData()?.urn;
+                    if (!urn) { throw new Error("URN not found in viewer model."); }
                     const response = await fetch('/api/ilots', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            urn: urn,
-                            config: {
-                                density: 0.4,
-                                types: ['work', 'meeting', 'social', 'break'],
-                                minDistance: 2.0
-                            }
-                        })
+                        body: JSON.stringify({ urn, config: { density: 0.4 } })
                     });
-                    
-                    if (!response.ok) {
-                        throw new Error(`Server error: ${response.status}`);
-                    }
-                    
+                    if (!response.ok) throw new Error(`Ilot generation API failed: ${response.statusText}`);
                     const result = await response.json();
-                    
-                    // Update analyzer with server results
-                    this.analyzer.ilots = result.ilots || [];
-                    
-                    this.populateIlotsList();
-                    this.visualizeAllIlots();
-                    this.showNotification(`Generated ${result.count} ilots successfully!`, 'success');
-                    
+                    this.ilots = result.ilots || [];
+                    return this.ilots;
                 } catch (error) {
-                    console.error('Failed to generate ilots:', error);
-                    this.showNotification('Failed to generate ilots: ' + error.message, 'error');
-                    
-                    // Fallback to local generation
-                    const ilots = this.analyzer.placeIlots({ density: 0.4, types: ['work', 'meeting', 'social', 'break'] });
-                    this.populateIlotsList();
-                    this.visualizeAllIlots();
-                    this.showNotification(`Generated ${ilots.length} ilots (local fallback)`, 'warning');
+                    console.error('Ilot generation failed:', error);
+                    showNotification('Could not generate ilots.', 'error');
+                    return null;
+                }
+            }
+        }
+
+        class DesignManager {
+            constructor(viewer, analyzer) {
+                this.viewer = viewer;
+                this.analyzer = analyzer;
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                document.getElementById('generateCorridorsBtn').addEventListener('click', () => this.analyze());
+                document.getElementById('generateIlotsBtn').addEventListener('click', () => this.generateIlots());
+                document.getElementById('exportPlanBtn').addEventListener('click', () => this.exportPlan());
+                document.getElementById('walkthrough3dBtn').addEventListener('click', () => this.toggleWalkthrough());
+                this.viewer.addEventListener(Autodesk.Viewing.SELECTION_CHANGED_EVENT, (e) => this.onSelectionChanged(e));
+            }
+
+            async analyze() {
+                showNotification('Analyzing floor plan...', 'info');
+                const analysis = await this.analyzer.analyzeFloorPlan();
+                if (analysis) {
+                    showNotification(`Analysis complete: ${analysis.rooms.length} rooms found.`, 'success');
+                    this.updateFloorPlanDetails();
+                }
+            }
+            
+            async generateIlots() {
+                showNotification('Generating ilots...', 'info');
+                const ilots = await this.analyzer.generateIlots();
+                if (ilots) {
+                    showNotification(`Generated ${ilots.length} ilots.`, 'success');
+                    this.updateIlotsList();
                 }
             }
 
-            clearIlots() {
-                this.analyzer.ilots = [];
-                this.populateIlotsList();
-                this.viewer.clearThemingColors();
-                this.showNotification('Ilots cleared', 'info');
-            }
-
-            populateRoomList() {
-                const roomList = document.getElementById('roomList');
-                if (!roomList) return;
-                roomList.innerHTML = '';
+            updateFloorPlanDetails() {
+                const totalArea = this.analyzer.rooms.reduce((acc, room) => acc + room.area, 0);
+                document.getElementById('totalArea').textContent = `${totalArea.toFixed(2)} m²`;
+                const roomListContainer = document.getElementById('roomList');
+                roomListContainer.innerHTML = '';
                 this.analyzer.rooms.forEach(room => {
-                    const btn = document.createElement('button');
-                    btn.className = 'room-button';
-                    btn.innerHTML = `<i class="fas fa-door-open"></i> ${room.name}`;
-                    btn.onclick = () => this.navigateToRoom(room.id);
-                    roomList.appendChild(btn);
+                    const roomEl = document.createElement('div');
+                    roomEl.className = 'list-item';
+                    roomEl.textContent = `${room.name} (${room.area.toFixed(1)} m²)`;
+                    roomEl.onclick = () => this.viewer.fitToView(room.dbId || []);
+                    roomListContainer.appendChild(roomEl);
                 });
             }
-
-            populateIlotsList() {
-                const ilotsList = document.getElementById('ilotsList');
-                if (!ilotsList) return;
-                ilotsList.innerHTML = '';
+            
+            updateIlotsList() {
+                const ilotsListContainer = document.getElementById('ilotsList');
+                ilotsListContainer.innerHTML = '';
                 this.analyzer.ilots.forEach(ilot => {
-                    const item = document.createElement('div');
-                    item.className = 'ilot-item';
-                    item.innerHTML = `
-                        <div class="ilot-type">${ilot.type.toUpperCase()}</div>
-                        <div class="ilot-details">Capacity: ${ilot.capacity} | Room: ${ilot.roomId}</div>
-                    `;
-                    item.onclick = () => this.focusOnIlot(ilot);
-                    ilotsList.appendChild(item);
+                    const ilotEl = document.createElement('div');
+                    ilotEl.className = 'list-item';
+                    ilotEl.textContent = `${ilot.type} in ${ilot.roomName}`;
+                    ilotEl.onclick = () => this.viewer.fitToView(ilot.dbId || []);
+                    ilotsListContainer.appendChild(ilotEl);
                 });
-            }
-
-            visualizeAllIlots() {
-                this.analyzer.ilots.forEach(ilot => this.visualizeIlot(ilot));
-            }
-
-            visualizeIlot(ilot) {
-                const colors = { work: 0x3b82f6, meeting: 0x10b981, social: 0xf59e0b, break: 0x8b5cf6 };
-                this.viewer.setThemingColor(ilot.roomId, new THREE.Vector4(
-                    ((colors[ilot.type] || 0x64748b) >> 16) / 255,
-                    (((colors[ilot.type] || 0x64748b) >> 8) & 0xff) / 255,
-                    ((colors[ilot.type] || 0x64748b) & 0xff) / 255,
-                    0.3
-                ));
-            }
-
-            focusOnIlot(ilot) {
-                this.viewer.fitToView([ilot.roomId]);
-                this.showNotification(`Focused on ${ilot.type} ilot`, 'info');
             }
 
             onSelectionChanged(event) {
-                if (!event || !event.dbIdArray) return;
-                const selection = event.dbIdArray;
-                if (selection.length > 0) {
-                    const room = this.analyzer.rooms.find(r => r.id === selection[0]);
-                    if (room) this.showRoomInfo(room);
-                }
-            }
-
-            showRoomInfo(room) {
-                const roomIlots = this.analyzer.ilots.filter(ilot => ilot.roomId === room.id);
-                const info = `<strong>${room.name}</strong><br>Type: ${room.type}<br>Area: ${this.analyzer.calculateRoomArea(room.bbox).toFixed(1)} m²<br>Ilots: ${roomIlots.length}`;
-                this.showTooltip(info, room.center);
-            }
-
-            handleKeyboardNavigation(event) {
-                if (!this.isNavigating) return;
-                switch (event.key) {
-                    case 'ArrowUp': case 'w': this.moveForward(); break;
-                    case 'ArrowDown': case 's': this.moveBackward(); break;
-                    case 'ArrowLeft': case 'a': this.turnLeft(); break;
-                    case 'ArrowRight': case 'd': this.turnRight(); break;
-                    case 'Escape': this.stopTour(); break;
-                }
-            }
-
-            moveForward() {
-                if (!this.viewer || !this.viewer.getCamera) return;
-                try {
-                    const camera = this.viewer.getCamera();
-                    const direction = camera.getWorldDirection(new THREE.Vector3());
-                    camera.position.add(direction.multiplyScalar(0.5));
-                    this.viewer.setCamera(camera);
-                } catch (error) {
-                    console.warn('Movement error:', error);
-                }
-            }
-
-            moveBackward() {
-                if (!this.viewer || !this.viewer.getCamera) return;
-                try {
-                    const camera = this.viewer.getCamera();
-                    const direction = camera.getWorldDirection(new THREE.Vector3());
-                    camera.position.add(direction.multiplyScalar(-0.5));
-                    this.viewer.setCamera(camera);
-                } catch (error) {
-                    console.warn('Movement error:', error);
-                }
-            }
-
-            turnLeft() {
-                if (!this.viewer || !this.viewer.getCamera) return;
-                try {
-                    const camera = this.viewer.getCamera();
-                    camera.rotation.z += 0.05;
-                    this.viewer.setCamera(camera);
-                } catch (error) {
-                    console.warn('Movement error:', error);
-                }
-            }
-
-            turnRight() {
-                if (!this.viewer || !this.viewer.getCamera) return;
-                try {
-                    const camera = this.viewer.getCamera();
-                    camera.rotation.z -= 0.05;
-                    this.viewer.setCamera(camera);
-                } catch (error) {
-                    console.warn('Movement error:', error);
-                }
-            }
-
-            setViewMode(mode) {
-                this.viewMode = mode;
-                switch (mode) {
-                    case '2d': this.viewer.setViewType && this.viewer.setViewType('plan'); break;
-                    case '3d': this.viewer.setViewType && this.viewer.setViewType('3d'); break;
-                    case 'walkthrough': this.enableWalkthroughMode(); break;
-                }
-            }
-
-            enableWalkthroughMode() {
-                const camera = this.viewer.getCamera();
-                camera.position.z = 1.7;
-                this.viewer.setCamera(camera);
-            }
-
-            showNotification(message, type = 'info') {
-                const notification = document.createElement('div');
-                notification.className = `notification notification-${type}`;
-                const icons = { success: 'check-circle', error: 'exclamation-circle', warning: 'exclamation-triangle', info: 'info-circle' };
-                notification.innerHTML = `<i class="fas fa-${icons[type] || 'info-circle'}"></i><span>${message}</span>`;
-                document.body.appendChild(notification);
-                setTimeout(() => notification.remove(), 3000);
-            }
-
-            showTooltip(content, position) {
-                const tooltip = document.createElement('div');
-                tooltip.className = 'tooltip-3d';
-                tooltip.innerHTML = content;
-                const screenPos = this.viewer.worldToClient(position);
-                tooltip.style.left = `${screenPos.x}px`;
-                tooltip.style.top = `${screenPos.y}px`;
-                document.body.appendChild(tooltip);
-                setTimeout(() => tooltip.remove(), 5000);
-            }
-        }
-
-        // Design Manager - Real-time design manipulation
-        class DesignManager {
-            constructor(viewer, floorAnalyzer) {
-                this.viewer = viewer;
-                this.analyzer = floorAnalyzer;
-                this.designData = null;
-                this.modifications = [];
-                this.selectedElements = [];
-            }
-
-            async loadRealDesign(urn) {
-                const response = await fetch('/api/design/details', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ urn })
-                });
-                
-                const result = await response.json();
-                this.designData = result.design;
-                this.displayRealDesign();
-                return this.designData;
-            }
-
-            displayRealDesign() {
-                this.enableRealTimeEditing();
-                this.showDesignElements();
-                this.createDesignPropertiesPanel();
-            }
-
-            enableRealTimeEditing() {
-                if (this.viewer && this.viewer.addEventListener) {
-                    this.viewer.addEventListener(Autodesk.Viewing.SELECTION_CHANGED_EVENT, (e) => {
-                        this.onElementSelected(e);
+                const propertiesInspector = document.getElementById('propertiesInspector');
+                propertiesInspector.innerHTML = '<p class="text-secondary">Loading properties...</p>';
+                if (event.dbIdArray.length > 0) {
+                    const dbId = event.dbIdArray[0];
+                    this.viewer.getProperties(dbId, (props) => {
+                        propertiesInspector.innerHTML = `<h4>${props.name}</h4>`;
+                        props.properties.forEach(prop => {
+                            if (!prop.hidden) {
+                                const propEl = document.createElement('div');
+                                propEl.innerHTML = `<strong>${prop.displayName}:</strong> ${prop.displayValue}`;
+                                propertiesInspector.appendChild(propEl);
+                            }
+                        });
                     });
+                } else {
+                    propertiesInspector.innerHTML = '<p class="text-secondary">Select an object to see its properties.</p>';
                 }
             }
 
-            showDesignElements() {
-                if (!this.designData || !this.designData.elements) return;
-                
-                this.designData.elements.forEach(element => {
-                    this.visualizeElement(element);
-                });
-                this.updateElementsList();
-            }
-
-            visualizeElement(element) {
-                const colors = { wall: 0xcccccc, door: 0x8B4513, window: 0x87CEEB, furniture: 0xDEB887 };
-                const color = new THREE.Color(colors[element.type] || 0x3b82f6);
-                
-                if (element.dbId) {
-                    this.viewer.setThemingColor(element.dbId, new THREE.Vector4(
-                        color.r, color.g, color.b, element.opacity || 0.8
-                    ));
+            exportPlan() { showNotification('Export functionality is a premium feature.', 'warning'); }
+            toggleWalkthrough() {
+                showNotification('Toggling First Person mode.', 'info');
+                const nav = this.viewer.navigation;
+                const toolName = 'firstperson';
+                if (nav.getActiveToolName() === toolName) {
+                    nav.deactivateTool(toolName);
+                } else {
+                    nav.activateTool(toolName);
                 }
-            }
-
-            onElementSelected(event) {
-                if (!event || !event.dbIdArray) return;
-                this.selectedElements = event.dbIdArray;
-                if (this.selectedElements.length > 0) {
-                    const element = this.findElementByDbId(this.selectedElements[0]);
-                    if (element) this.showElementDetails(element);
-                }
-            }
-
-            showElementDetails(element) {
-                const detailsPanel = document.getElementById('elementDetails');
-                if (!detailsPanel) return;
-
-                detailsPanel.innerHTML = `
-                    <h4>${element.name || 'Element'}</h4>
-                    <div class="detail-group">
-                        <label>Type:</label>
-                        <input type="text" value="${element.type}" onchange="designManager.updateElement('type', this.value)">
-                    </div>
-                    <div class="detail-group">
-                        <label>Dimensions:</label>
-                        <input type="number" placeholder="Width" value="${element.width || ''}" onchange="designManager.updateElement('width', this.value)">
-                        <input type="number" placeholder="Height" value="${element.height || ''}" onchange="designManager.updateElement('height', this.value)">
-                        <input type="number" placeholder="Depth" value="${element.depth || ''}" onchange="designManager.updateElement('depth', this.value)">
-                    </div>
-                    <div class="detail-group">
-                        <label>Position:</label>
-                        <input type="number" placeholder="X" value="${element.position?.x || 0}" onchange="designManager.updateElement('positionX', this.value)">
-                        <input type="number" placeholder="Y" value="${element.position?.y || 0}" onchange="designManager.updateElement('positionY', this.value)">
-                        <input type="number" placeholder="Z" value="${element.position?.z || 0}" onchange="designManager.updateElement('positionZ', this.value)">
-                    </div>
-                    <div class="detail-group">
-                        <label>Material:</label>
-                        <select onchange="designManager.updateElement('material', this.value)">
-                            <option value="concrete" ${element.material === 'concrete' ? 'selected' : ''}>Concrete</option>
-                            <option value="steel" ${element.material === 'steel' ? 'selected' : ''}>Steel</option>
-                            <option value="wood" ${element.material === 'wood' ? 'selected' : ''}>Wood</option>
-                            <option value="glass" ${element.material === 'glass' ? 'selected' : ''}>Glass</option>
-                        </select>
-                    </div>
-                    <div class="detail-group">
-                        <button onclick="designManager.duplicateElement()">Duplicate</button>
-                        <button onclick="designManager.deleteElement()">Delete</button>
-                    </div>
-                `;
-            }
-
-            updateElement(property, value) {
-                if (this.selectedElements.length === 0) return;
-                const element = this.findElementByDbId(this.selectedElements[0]);
-                if (!element) return;
-
-                switch (property) {
-                    case 'positionX': element.position.x = parseFloat(value); break;
-                    case 'positionY': element.position.y = parseFloat(value); break;
-                    case 'positionZ': element.position.z = parseFloat(value); break;
-                    default: element[property] = value;
-                }
-
-                this.applyElementChanges(element);
-                this.modifications.push({ elementId: element.id, property, value, timestamp: Date.now() });
-            }
-
-            applyElementChanges(element) {
-                this.visualizeElement(element);
-            }
-
-            addElement(elementData) {
-                const newElement = {
-                    id: Date.now(),
-                    dbId: this.getNextDbId(),
-                    ...elementData,
-                    position: elementData.position || { x: 0, y: 0, z: 0 }
-                };
-
-                this.designData.elements.push(newElement);
-                this.visualizeElement(newElement);
-                this.updateElementsList();
-                return newElement;
-            }
-
-            duplicateElement() {
-                if (this.selectedElements.length === 0) return;
-                const element = this.findElementByDbId(this.selectedElements[0]);
-                if (!element) return;
-
-                const duplicate = {
-                    ...element,
-                    id: Date.now(),
-                    dbId: this.getNextDbId(),
-                    position: { x: element.position.x + 2, y: element.position.y + 2, z: element.position.z }
-                };
-                this.addElement(duplicate);
-            }
-
-            deleteElement() {
-                if (this.selectedElements.length === 0) return;
-                const elementId = this.selectedElements[0];
-                this.designData.elements = this.designData.elements.filter(e => e.dbId !== elementId);
-                this.viewer.hide(elementId);
-                this.updateElementsList();
-                this.selectedElements = [];
-                document.getElementById('elementDetails').innerHTML = '<p>No element selected</p>';
-            }
-
-            createDesignPropertiesPanel() {
-                const panel = document.createElement('div');
-                panel.id = 'designPropertiesPanel';
-                panel.className = 'design-properties-panel';
-                panel.innerHTML = `
-                    <div class="panel-header">
-                        <h3><i class="fas fa-cogs"></i> Design Properties</h3>
-                    </div>
-                    <div class="panel-content">
-                        <div class="section">
-                            <h4>Element Details</h4>
-                            <div id="elementDetails"><p>Select an element to view details</p></div>
-                        </div>
-                        <div class="section">
-                            <h4>Add Elements</h4>
-                            <button onclick="designManager.addWall()" class="btn-primary">Add Wall</button>
-                            <button onclick="designManager.addDoor()" class="btn-primary">Add Door</button>
-                            <button onclick="designManager.addWindow()" class="btn-primary">Add Window</button>
-                            <button onclick="designManager.addFurniture()" class="btn-primary">Add Furniture</button>
-                        </div>
-                        <div class="section">
-                            <h4>Design Actions</h4>
-                            <button onclick="designManager.saveDesign()" class="btn-success">Save Design</button>
-                            <button onclick="designManager.exportDesign()" class="btn-primary">Export</button>
-                        </div>
-                        <div class="section">
-                            <h4>Elements List</h4>
-                            <div id="elementsList" class="elements-list"></div>
-                        </div>
-                    </div>
-                `;
-                document.body.appendChild(panel);
-            }
-
-            addWall() { this.addElement({ type: 'wall', name: 'Wall', width: 0.2, height: 3, depth: 5, material: 'concrete', color: '#cccccc' }); }
-            addDoor() { this.addElement({ type: 'door', name: 'Door', width: 0.1, height: 2.1, depth: 0.9, material: 'wood', color: '#8B4513' }); }
-            addWindow() { this.addElement({ type: 'window', name: 'Window', width: 0.1, height: 1.2, depth: 1.5, material: 'glass', color: '#87CEEB' }); }
-            addFurniture() { this.addElement({ type: 'furniture', name: 'Desk', width: 1.2, height: 0.75, depth: 0.6, material: 'wood', color: '#DEB887' }); }
-
-            async saveDesign() {
-                const response = await fetch('/api/design/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ designData: this.designData, modifications: this.modifications })
-                });
-                if (response.ok) {
-                    this.showNotification('Design saved successfully!', 'success');
-                    this.modifications = [];
-                }
-            }
-
-            exportDesign() {
-                const exportData = { designData: this.designData, modifications: this.modifications, timestamp: new Date().toISOString() };
-                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `design_${Date.now()}.json`;
-                a.click();
-            }
-
-            updateElementsList() {
-                const list = document.getElementById('elementsList');
-                if (!list || !this.designData) return;
-                list.innerHTML = '';
-                this.designData.elements.forEach(element => {
-                    const item = document.createElement('div');
-                    item.className = 'element-item';
-                    item.innerHTML = `<span>${element.name || element.type}</span><button onclick="designManager.selectElement(${element.dbId})">Select</button>`;
-                    list.appendChild(item);
-                });
-            }
-
-            selectElement(dbId) {
-                this.viewer.select([dbId]);
-                this.viewer.fitToView([dbId]);
-            }
-
-            findElementByDbId(dbId) {
-                return this.designData?.elements?.find(e => e.dbId === dbId);
-            }
-
-            getNextDbId() {
-                return Math.max(...this.designData.elements.map(e => e.dbId || 0)) + 1;
-            }
-
-            showNotification(message, type) {
-                const notification = document.createElement('div');
-                notification.className = `notification notification-${type}`;
-                notification.innerHTML = `<span>${message}</span>`;
-                document.body.appendChild(notification);
-                setTimeout(() => notification.remove(), 3000);
             }
         }
 
-        // Main Application
-        const fileInput = document.getElementById('fileInput');
-        const statusOverlay = document.getElementById('statusOverlay');
-        const statusText = document.getElementById('statusText');
-        const statusSubText = document.getElementById('statusSubText');
-        let viewer, floorAnalyzer, navigationController, designManager;
+        // --- Main Application Flow ---
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+            setupSidebarToggles();
+            updateStatus('Welcome to FloorPlan Pro', 'Upload a CAD file to begin.');
+        });
 
-        fileInput.addEventListener('change', async (event) => {
+        async function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            statusOverlay.classList.remove('hidden');
             updateStatus('Uploading file...', 'Please wait while we send your file to the server.');
-
             const formData = new FormData();
             formData.append('file', file);
 
             try {
                 const jobResponse = await fetch('/api/jobs', { method: 'POST', body: formData });
-                if (!jobResponse.ok) throw new Error(`Server returned status ${jobResponse.status}`);
+                if (!jobResponse.ok) throw new Error(`Server error: ${jobResponse.statusText}`);
                 const job = await jobResponse.json();
-                currentUrn = job.urn; // Store for skip functionality
+                
                 updateStatus('Processing on Server', 'Your file is being translated for viewing. This may take a moment.');
-
                 await pollForCompletion(job.urn);
+                
                 updateStatus('Initializing Viewer', 'Almost there...');
                 initializeViewer(job.urn);
-
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Upload/Processing Error:', error);
                 updateStatus('Error', error.message, true);
             }
-        });
+        }
 
         function pollForCompletion(urn) {
             return new Promise((resolve, reject) => {
-                let attempts = 0;
-                const maxAttempts = 24; // 2 minutes max (24 * 5s)
-                
                 const interval = setInterval(async () => {
-                    attempts++;
-                    
                     try {
                         const statusResponse = await fetch(`/api/jobs/${urn}/status`);
                         const data = await statusResponse.json();
-
                         if (data.status === 'success') {
                             clearInterval(interval);
                             resolve();
                         } else if (data.status === 'failed') {
                             clearInterval(interval);
                             reject(new Error(`Translation failed: ${JSON.stringify(data.details)}`));
-                        } else if (attempts >= maxAttempts) {
-                            clearInterval(interval);
-                            // Skip to viewer anyway - might work
-                            updateStatus('Processing timeout - attempting to load viewer...', 'Some files take longer to process');
-                            resolve();
                         } else {
-                            updateStatus('Processing on Server', `${data.progress || 'Starting...'} (${attempts}/${maxAttempts})`);
+                            updateStatus('Processing on Server', `${data.progress || 'Starting...'}`);
                         }
                     } catch (error) {
                         clearInterval(interval);
@@ -1124,26 +337,20 @@
                 }, 5000);
             });
         }
-
+        
         async function getAccessToken() {
             const response = await fetch('/api/auth/token');
+            if (!response.ok) throw new Error('Failed to get access token');
             const data = await response.json();
             return data.access_token;
         }
 
         function initializeViewer(urn) {
-            const options = { env: 'AutodeskProduction', getAccessToken: async (onTokenReady) => {
-                const token = await getAccessToken();
-                onTokenReady(token, 3600);
-            }};
-
-            if (viewer) {
-                viewer.finish();
-                viewer = null;
-            }
+            const options = { env: 'AutodeskProduction', getAccessToken };
+            if (viewer) { viewer.finish(); viewer = null; }
 
             Autodesk.Viewing.Initializer(options, () => {
-                viewer = new Autodesk.Viewing.GuiViewer3D(document.getElementById('viewer'));
+                viewer = new Autodesk.Viewing.GuiViewer3D(document.getElementById('forgeViewer'));
                 viewer.start();
                 const documentId = 'urn:' + urn;
                 Autodesk.Viewing.Document.load(documentId, onDocumentLoadSuccess, onDocumentLoadFailure);
@@ -1151,81 +358,62 @@
         }
 
         function onDocumentLoadSuccess(doc) {
-            try {
-                const viewables = doc.getRoot().getDefaultGeometry();
-                if (!viewables) {
-                    throw new Error('No viewable geometry found in document');
-                }
-                
-                viewer.loadDocumentNode(doc, viewables).then(i => {
-                    statusOverlay.classList.add('hidden');
-                    
-                    // Initialize floor analysis, navigation, and design management
-                    floorAnalyzer = new FloorAnalyzer(viewer);
-                    navigationController = new NavigationController(viewer, floorAnalyzer);
-                    designManager = new DesignManager(viewer, floorAnalyzer);
-                    
-                    navigationController.initialize();
-                    
-                    // Wait for model to be fully loaded before analysis
-                    viewer.addEventListener(Autodesk.Viewing.GEOMETRY_LOADED_EVENT, async () => {
-                        console.log('Geometry loaded, starting analysis...');
-                        
-                        try {
-                            const analysis = await floorAnalyzer.analyzeFloorPlan();
-                            console.log('Floor analysis complete:', analysis);
-                            
-                            // Load complete design details
-                            const designDetails = await designManager.loadRealDesign(viewer.model?.getData()?.urn || 'mock-urn');
-                            console.log('Design details loaded:', designDetails);
-                            
-                            navigationController.showNotification(`Design Loaded: ${analysis.rooms.length} rooms, ${designDetails?.elements?.length || 0} elements`, 'success');
-                        } catch (error) {
-                            console.error('Analysis error:', error);
-                            navigationController.showNotification('Analysis completed with mock data', 'warning');
-                        }
-                    });
-                    
-                }).catch(error => {
-                    console.error('Error loading document node:', error);
-                    updateStatus('Error loading model', error.message, true);
-                });
-            } catch (error) {
-                console.error('Error in document load success:', error);
-                updateStatus('Error processing document', error.message, true);
-            }
+            const viewables = doc.getRoot().getDefaultGeometry();
+            viewer.loadDocumentNode(doc, viewables).then(() => {
+                document.getElementById('statusOverlay').classList.add('hidden');
+                floorAnalyzer = new FloorAnalyzer(viewer);
+                designManager = new DesignManager(viewer, floorAnalyzer);
+                showNotification('Model loaded successfully!', 'success');
+            }).catch(err => onDocumentLoadFailure('load_node_error', err));
         }
 
-        function onDocumentLoadFailure(viewerErrorCode, viewerErrorMsg) {
-            console.error('Loading failed:', viewerErrorCode, viewerErrorMsg);
-            updateStatus('Error loading viewer', viewerErrorMsg, true);
+        function onDocumentLoadFailure(code, message) {
+            console.error('Loading failed:', code, message);
+            updateStatus('Error loading model', `Could not load the model. (${message})`, true);
         }
 
-        let currentUrn = null;
-        
-        function updateStatus(mainText, subText, isError = false) {
-            statusText.textContent = mainText;
-            statusSubText.textContent = subText;
-            if(isError) statusText.style.color = 'var(--danger)';
-            else statusText.style.color = 'white';
+        function setupSidebarToggles() {
+            const appContainer = document.getElementById('appContainer');
+            const leftSidebar = document.getElementById('leftSidebar');
+            const rightSidebar = document.getElementById('rightSidebar');
+            const leftToggle = document.getElementById('left-sidebar-toggle');
+            const rightToggle = document.getElementById('right-sidebar-toggle');
+
+            leftToggle.addEventListener('click', () => {
+                leftSidebar.classList.toggle('collapsed');
+                updateGridLayout();
+                leftToggle.querySelector('i').className = leftSidebar.classList.contains('collapsed') ? 'fas fa-chevron-right' : 'fas fa-chevron-left';
+            });
+
+            rightToggle.addEventListener('click', () => {
+                rightSidebar.classList.toggle('collapsed');
+                updateGridLayout();
+                rightToggle.querySelector('i').className = rightSidebar.classList.contains('collapsed') ? 'fas fa-chevron-left' : 'fas fa-chevron-right';
+            });
             
-            // Show skip button after 30 seconds of processing
-            if (mainText.includes('Processing') && !isError) {
-                setTimeout(() => {
-                    const skipBtn = document.getElementById('skipProcessing');
-                    if (skipBtn && mainText.includes('Processing')) {
-                        skipBtn.style.display = 'inline-block';
-                    }
-                }, 30000);
+            function updateGridLayout() {
+                const leftW = leftSidebar.classList.contains('collapsed') ? '0px' : '300px';
+                const rightW = rightSidebar.classList.contains('collapsed') ? '0px' : '350px';
+                appContainer.style.gridTemplateColumns = `${leftW} 1fr ${rightW}`;
+                 // A short delay to allow the layout to update before resizing the viewer
+                setTimeout(() => viewer?.resize(), 350);
             }
         }
+
+        function updateStatus(mainText, subText = '', isError = false) {
+            const overlay = document.getElementById('statusOverlay');
+            overlay.classList.remove('hidden');
+            document.getElementById('statusText').textContent = mainText;
+            document.getElementById('statusSubText').textContent = subText;
+            document.getElementById('statusText').style.color = isError ? 'var(--danger)' : 'white';
+        }
         
-        function skipToViewer() {
-            if (currentUrn) {
-                updateStatus('Initializing Viewer', 'Loading with available data...');
-                document.getElementById('skipProcessing').style.display = 'none';
-                initializeViewer(currentUrn);
-            }
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'info-circle'}"></i><span>${message}</span>`;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 4000);
         }
     </script>
 </body>
