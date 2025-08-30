@@ -103,6 +103,7 @@
                     <div id="statusOverlay" class="status-overlay">
                         <div id="statusText" style="font-size: 1.2rem; font-weight: 600;">Welcome to FloorPlan Pro</div>
                         <div id="statusSubText" style="font-size: 0.9rem; opacity: 0.8;">Upload a CAD file to begin.</div>
+                        <button id="skipProcessing" class="btn-secondary" style="margin-top: 1rem; display: none;" onclick="skipToViewer()">Skip Processing & Continue</button>
                     </div>
                 </div>
             </div>
@@ -402,6 +403,9 @@
                             </select>
                         </div>
                         <div class="nav-section">
+                            <button id="analyzeFloor" class="btn-success"><i class="fas fa-search"></i> Analyze Floor</button>
+                        </div>
+                        <div class="nav-section">
                             <button id="startTour" class="btn-primary"><i class="fas fa-play"></i> Start Tour</button>
                             <button id="stopTour" class="btn-secondary" disabled><i class="fas fa-stop"></i> Stop</button>
                         </div>
@@ -463,6 +467,7 @@
 
             setupEventListeners() {
                 document.getElementById('viewMode')?.addEventListener('change', (e) => this.setViewMode(e.target.value));
+                document.getElementById('analyzeFloor')?.addEventListener('click', () => this.analyzeFloor());
                 document.getElementById('startTour')?.addEventListener('click', () => this.startGuidedTour());
                 document.getElementById('stopTour')?.addEventListener('click', () => this.stopTour());
                 document.getElementById('generateIlots')?.addEventListener('click', () => this.generateIlots());
@@ -477,6 +482,48 @@
                 document.addEventListener('keydown', (e) => this.handleKeyboardNavigation(e));
                 if (this.viewer && this.viewer.addEventListener) {
                     this.viewer.addEventListener(Autodesk.Viewing.SELECTION_CHANGED_EVENT, (event) => this.onSelectionChanged(event));
+                }
+            }
+
+            async analyzeFloor() {
+                try {
+                    this.showNotification('Analyzing floor plan...', 'info');
+                    
+                    // Get current URN from viewer
+                    const urn = this.viewer?.model?.getData()?.urn || 'demo-urn';
+                    
+                    // Call backend API
+                    const response = await fetch('/api/analyze', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            urn: urn,
+                            analysisType: 'full'
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Server error: ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    // Update analyzer with server results
+                    this.analyzer.rooms = result.analysis.rooms || [];
+                    this.analyzer.corridors = result.analysis.corridors || [];
+                    this.analyzer.navigationPaths = result.analysis.navigationPaths || [];
+                    
+                    this.populateRoomList();
+                    this.showNotification(`Analysis complete: ${result.analysis.rooms.length} rooms, ${result.analysis.corridors.length} corridors found!`, 'success');
+                    
+                } catch (error) {
+                    console.error('Failed to analyze floor:', error);
+                    this.showNotification('Analysis failed: ' + error.message, 'error');
+                    
+                    // Fallback to local analysis
+                    await this.analyzer.analyzeFloorPlan();
+                    this.populateRoomList();
+                    this.showNotification('Using local analysis (fallback)', 'warning');
                 }
             }
 
@@ -510,20 +557,84 @@
                 const targetRoom = this.analyzer.rooms.find(r => r.id === roomId);
                 if (!targetRoom) { this.showNotification('Room not found', 'error'); return; }
 
-                const path = this.analyzer.navigateToRoom(roomId);
-                if (path) {
-                    this.showNotification(`Navigating to ${targetRoom.name}`, 'info');
-                    document.getElementById('currentLocation').textContent = targetRoom.name;
-                } else {
-                    this.showNotification(`Cannot find path to ${targetRoom.name}`, 'warning');
+                try {
+                    // Call backend navigation API
+                    const urn = this.viewer?.model?.getData()?.urn || 'demo-urn';
+                    const response = await fetch('/api/navigation', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            urn: urn,
+                            from: this.currentTour.currentRoom,
+                            to: roomId,
+                            mode: 'shortest'
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        this.analyzer.animateNavigation(result.path);
+                        this.showNotification(`Navigating to ${targetRoom.name} (${result.distance.toFixed(1)}m)`, 'info');
+                    } else {
+                        throw new Error('Navigation API failed');
+                    }
+                } catch (error) {
+                    // Fallback to local navigation
+                    const path = this.analyzer.navigateToRoom(roomId);
+                    if (path) {
+                        this.showNotification(`Navigating to ${targetRoom.name}`, 'info');
+                    } else {
+                        this.showNotification(`Cannot find path to ${targetRoom.name}`, 'warning');
+                    }
                 }
+                
+                document.getElementById('currentLocation').textContent = targetRoom.name;
             }
 
-            generateIlots() {
-                const ilots = this.analyzer.placeIlots({ density: 0.4, types: ['work', 'meeting', 'social', 'break'] });
-                this.populateIlotsList();
-                this.visualizeAllIlots();
-                this.showNotification(`Generated ${ilots.length} ilots`, 'success');
+            async generateIlots() {
+                try {
+                    this.showNotification('Generating ilots...', 'info');
+                    
+                    // Get current URN from viewer
+                    const urn = this.viewer?.model?.getData()?.urn || 'demo-urn';
+                    
+                    // Call backend API
+                    const response = await fetch('/api/ilots', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            urn: urn,
+                            config: {
+                                density: 0.4,
+                                types: ['work', 'meeting', 'social', 'break'],
+                                minDistance: 2.0
+                            }
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Server error: ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    // Update analyzer with server results
+                    this.analyzer.ilots = result.ilots || [];
+                    
+                    this.populateIlotsList();
+                    this.visualizeAllIlots();
+                    this.showNotification(`Generated ${result.count} ilots successfully!`, 'success');
+                    
+                } catch (error) {
+                    console.error('Failed to generate ilots:', error);
+                    this.showNotification('Failed to generate ilots: ' + error.message, 'error');
+                    
+                    // Fallback to local generation
+                    const ilots = this.analyzer.placeIlots({ density: 0.4, types: ['work', 'meeting', 'social', 'break'] });
+                    this.populateIlotsList();
+                    this.visualizeAllIlots();
+                    this.showNotification(`Generated ${ilots.length} ilots (local fallback)`, 'warning');
+                }
             }
 
             clearIlots() {
@@ -967,6 +1078,7 @@
                 const jobResponse = await fetch('/api/jobs', { method: 'POST', body: formData });
                 if (!jobResponse.ok) throw new Error(`Server returned status ${jobResponse.status}`);
                 const job = await jobResponse.json();
+                currentUrn = job.urn; // Store for skip functionality
                 updateStatus('Processing on Server', 'Your file is being translated for viewing. This may take a moment.');
 
                 await pollForCompletion(job.urn);
@@ -981,7 +1093,12 @@
 
         function pollForCompletion(urn) {
             return new Promise((resolve, reject) => {
+                let attempts = 0;
+                const maxAttempts = 24; // 2 minutes max (24 * 5s)
+                
                 const interval = setInterval(async () => {
+                    attempts++;
+                    
                     try {
                         const statusResponse = await fetch(`/api/jobs/${urn}/status`);
                         const data = await statusResponse.json();
@@ -992,8 +1109,13 @@
                         } else if (data.status === 'failed') {
                             clearInterval(interval);
                             reject(new Error(`Translation failed: ${JSON.stringify(data.details)}`));
+                        } else if (attempts >= maxAttempts) {
+                            clearInterval(interval);
+                            // Skip to viewer anyway - might work
+                            updateStatus('Processing timeout - attempting to load viewer...', 'Some files take longer to process');
+                            resolve();
                         } else {
-                            updateStatus('Processing on Server', `${data.progress || 'Starting...'}`);
+                            updateStatus('Processing on Server', `${data.progress || 'Starting...'} (${attempts}/${maxAttempts})`);
                         }
                     } catch (error) {
                         clearInterval(interval);
@@ -1079,11 +1201,31 @@
             updateStatus('Error loading viewer', viewerErrorMsg, true);
         }
 
+        let currentUrn = null;
+        
         function updateStatus(mainText, subText, isError = false) {
             statusText.textContent = mainText;
             statusSubText.textContent = subText;
             if(isError) statusText.style.color = 'var(--danger)';
             else statusText.style.color = 'white';
+            
+            // Show skip button after 30 seconds of processing
+            if (mainText.includes('Processing') && !isError) {
+                setTimeout(() => {
+                    const skipBtn = document.getElementById('skipProcessing');
+                    if (skipBtn && mainText.includes('Processing')) {
+                        skipBtn.style.display = 'inline-block';
+                    }
+                }, 30000);
+            }
+        }
+        
+        function skipToViewer() {
+            if (currentUrn) {
+                updateStatus('Initializing Viewer', 'Loading with available data...');
+                document.getElementById('skipProcessing').style.display = 'none';
+                initializeViewer(currentUrn);
+            }
         }
     </script>
 </body>

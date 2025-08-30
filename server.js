@@ -469,32 +469,42 @@ app.post('/api/jobs', upload.single('file'), async (req, res) => {
     const objectName = Date.now() + '-' + originalFilename;
 
     try {
-        console.log(`Uploading ${originalFilename}...`);
+        console.log(`🚀 Starting upload: ${originalFilename}`);
         
-        // Get token using direct HTTP
+        // Step 1: Get authentication token
+        console.log('📝 Step 1: Getting authentication token...');
         const authResponse = await axios.post('https://developer.api.autodesk.com/authentication/v2/token', 
             `client_id=${APS_CLIENT_ID}&client_secret=${APS_CLIENT_SECRET}&grant_type=client_credentials&scope=data:read data:write bucket:create`,
             { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
         );
         
         const token = authResponse.data.access_token;
-        const bucketKey = APS_CLIENT_ID.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 32);
+        console.log('✅ Token obtained successfully');
         
-        // Create bucket using OSS v2
+        const bucketKey = APS_CLIENT_ID.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 32);
+        console.log('📦 Using bucket:', bucketKey);
+        
+        // Step 2: Create bucket
+        console.log('📝 Step 2: Creating/checking bucket...');
         try {
             await axios.post('https://developer.api.autodesk.com/oss/v2/buckets', 
                 { bucketKey, policyKey: 'transient' },
                 { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
             );
-            console.log('Bucket created:', bucketKey);
+            console.log('✅ Bucket created successfully');
         } catch (error) {
             if (error.response?.status === 409) {
-                console.log('Using existing bucket:', bucketKey);
+                console.log('✅ Using existing bucket');
+            } else {
+                console.error('❌ Bucket creation failed:', error.response?.status, error.response?.data);
+                throw error;
             }
         }
         
-        // Step 1: Get signed S3 upload URL
+        // Step 3: Get signed S3 upload URL
+        console.log('📝 Step 3: Getting signed S3 upload URL...');
         const fileContent = await fs.promises.readFile(filePath);
+        console.log(`📄 File size: ${fileContent.length} bytes`);
         
         const signedResponse = await axios.get(
             `https://developer.api.autodesk.com/oss/v2/buckets/${bucketKey}/objects/${objectName}/signeds3upload`,
@@ -503,49 +513,64 @@ app.post('/api/jobs', upload.single('file'), async (req, res) => {
         
         const uploadKey = signedResponse.data.uploadKey;
         const uploadUrl = signedResponse.data.urls[0];
+        console.log('✅ Signed URL obtained');
         
-        // Step 2: Upload file directly to S3
+        // Step 4: Upload file directly to S3
+        console.log('📝 Step 4: Uploading to S3...');
         await axios.put(uploadUrl, fileContent, {
             headers: { 'Content-Type': 'application/octet-stream' }
         });
+        console.log('✅ File uploaded to S3 successfully');
         
-        // Step 3: Complete upload
+        // Step 5: Complete upload
+        console.log('📝 Step 5: Completing upload...');
         const completeResponse = await axios.post(
             `https://developer.api.autodesk.com/oss/v2/buckets/${bucketKey}/objects/${objectName}/signeds3upload`,
             { uploadKey },
             { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
         );
         
-        const uploadResponse = { data: { objectId: completeResponse.data.objectId } };
+        const objectId = completeResponse.data.objectId;
+        const urn = Buffer.from(objectId).toString('base64');
+        console.log('✅ Upload completed. Object ID:', objectId);
+        console.log('🔗 URN:', urn);
         
-        const urn = Buffer.from(uploadResponse.data.objectId).toString('base64');
-        
-        // Start translation using v2
-        await axios.post('https://developer.api.autodesk.com/modelderivative/v2/designdata/job',
+        // Step 6: Start translation
+        console.log('📝 Step 6: Starting Model Derivative translation...');
+        const translationResponse = await axios.post('https://developer.api.autodesk.com/modelderivative/v2/designdata/job',
             {
                 input: { urn },
                 output: { formats: [{ type: 'svf', views: ['2d', '3d'] }] }
             },
             { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } }
         );
+        console.log('✅ Translation job started:', translationResponse.data);
         
         await fs.promises.unlink(filePath);
         
         res.json({
-            message: 'File uploaded and translation started.',
+            success: true,
+            message: 'File uploaded and translation started successfully!',
             urn: urn,
-            filename: originalFilename
+            filename: originalFilename,
+            objectId: objectId
         });
         
     } catch (error) {
-        console.error('Upload failed:', error.message);
+        console.error('❌ UPLOAD FAILED:');
+        console.error('Error message:', error.message);
+        if (error.response) {
+            console.error('HTTP Status:', error.response.status);
+            console.error('Response data:', JSON.stringify(error.response.data, null, 2));
+            console.error('Request URL:', error.config?.url);
+        }
+        
         await fs.promises.unlink(filePath).catch(() => {});
         
-        const mockUrn = Buffer.from(`mock:${objectName}:${Date.now()}`).toString('base64');
-        res.json({
-            message: 'Upload failed, using mock URN.',
-            urn: mockUrn,
-            filename: originalFilename
+        res.status(500).json({
+            success: false,
+            error: 'Upload failed - check server logs for details',
+            details: error.response?.data || error.message
         });
     }
 });
@@ -554,11 +579,7 @@ app.post('/api/jobs', upload.single('file'), async (req, res) => {
 app.get('/api/jobs/:urn/status', async (req, res) => {
     const { urn } = req.params;
     try {
-        // For mock URNs, return success immediately
-        if (urn.startsWith(Buffer.from('mock:').toString('base64').substring(0, 8))) {
-            res.json({ status: 'success', progress: '100%' });
-            return;
-        }
+        console.log(`📝 Checking status for URN: ${urn}`);
         
         // Get token using direct HTTP (more reliable)
         const authResponse = await axios.post('https://developer.api.autodesk.com/authentication/v2/token', 
@@ -583,8 +604,16 @@ app.get('/api/jobs/:urn/status', async (req, res) => {
             res.json({ status: 'inprogress', progress: manifest.progress });
         }
     } catch (error) {
-        console.error(`Failed to get manifest for ${urn}:`, error.message);
-        res.json({ status: 'success', progress: '100%' }); // Fallback to success for demo
+        console.error(`❌ Failed to get manifest for ${urn}:`, error.message);
+        if (error.response) {
+            console.error('Status:', error.response.status);
+            console.error('Details:', error.response.data);
+        }
+        res.status(500).json({ 
+            status: 'error', 
+            error: 'Failed to get job status',
+            details: error.response?.data || error.message
+        });
     }
 });
 
