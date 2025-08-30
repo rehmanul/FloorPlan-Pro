@@ -286,13 +286,12 @@
 
         // --- Main Application Flow ---
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+            document.getElementById('fileInput').addEventListener('change', (e) => handleFileUpload(e.target.files[0]));
             setupSidebarToggles();
             updateStatus('Welcome to FloorPlan Pro', 'Upload a CAD file to begin.');
         });
 
-        async function handleFileUpload(event) {
-            const file = event.target.files[0];
+        async function handleFileUpload(file) {
             if (!file) return;
 
             updateStatus('Uploading file...', 'Please wait while we send your file to the server.');
@@ -301,10 +300,13 @@
 
             try {
                 const jobResponse = await fetch('/api/jobs', { method: 'POST', body: formData });
-                if (!jobResponse.ok) throw new Error(`Server error: ${jobResponse.statusText}`);
+                if (!jobResponse.ok) {
+                    const errorData = await jobResponse.json();
+                    throw new Error(`Server error: ${errorData.error || jobResponse.statusText}`);
+                }
                 const job = await jobResponse.json();
                 
-                updateStatus('Processing on Server', 'Your file is being translated for viewing. This may take a moment.');
+                updateStatus('Processing on Server', 'Your file is being translated...');
                 await pollForCompletion(job.urn);
                 
                 updateStatus('Initializing Viewer', 'Almost there...');
@@ -316,19 +318,35 @@
         }
 
         function pollForCompletion(urn) {
+            let attempts = 0;
+            const maxAttempts = 60; // 5 minute timeout
             return new Promise((resolve, reject) => {
                 const interval = setInterval(async () => {
                     try {
+                        attempts++;
+                        if (attempts > maxAttempts) {
+                            clearInterval(interval);
+                            return reject(new Error('Processing timed out. Please try again with a smaller file.'));
+                        }
+
                         const statusResponse = await fetch(`/api/jobs/${urn}/status`);
+                        if (!statusResponse.ok) throw new Error(`Status check failed: ${statusResponse.statusText}`);
+                        
                         const data = await statusResponse.json();
+                        
+                        let progressMessage = `(Attempt ${attempts}/${maxAttempts})`;
+                        if (data.progress && data.progress !== 'complete') {
+                            progressMessage = data.progress;
+                        }
+                        updateStatus('Processing on Server', progressMessage);
+
                         if (data.status === 'success') {
                             clearInterval(interval);
                             resolve();
                         } else if (data.status === 'failed') {
                             clearInterval(interval);
-                            reject(new Error(`Translation failed: ${JSON.stringify(data.details)}`));
-                        } else {
-                            updateStatus('Processing on Server', `${data.progress || 'Starting...'}`);
+                            const errorMsg = data.derivatives?.[0]?.messages?.[0]?.message || 'Unknown processing error.';
+                            reject(new Error(`Translation failed: ${errorMsg}`));
                         }
                     } catch (error) {
                         clearInterval(interval);
@@ -359,17 +377,21 @@
 
         function onDocumentLoadSuccess(doc) {
             const viewables = doc.getRoot().getDefaultGeometry();
+            if (!viewables) {
+                onDocumentLoadFailure('no-viewables', 'Document does not contain any viewable geometry.');
+                return;
+            }
             viewer.loadDocumentNode(doc, viewables).then(() => {
                 document.getElementById('statusOverlay').classList.add('hidden');
                 floorAnalyzer = new FloorAnalyzer(viewer);
                 designManager = new DesignManager(viewer, floorAnalyzer);
                 showNotification('Model loaded successfully!', 'success');
-            }).catch(err => onDocumentLoadFailure('load_node_error', err));
+            }).catch(err => onDocumentLoadFailure('load_node_error', err.message));
         }
 
         function onDocumentLoadFailure(code, message) {
             console.error('Loading failed:', code, message);
-            updateStatus('Error loading model', `Could not load the model. (${message})`, true);
+            updateStatus('Error loading model', `Could not load the model. Code: ${code}`, true);
         }
 
         function setupSidebarToggles() {
@@ -395,7 +417,6 @@
                 const leftW = leftSidebar.classList.contains('collapsed') ? '0px' : '300px';
                 const rightW = rightSidebar.classList.contains('collapsed') ? '0px' : '350px';
                 appContainer.style.gridTemplateColumns = `${leftW} 1fr ${rightW}`;
-                 // A short delay to allow the layout to update before resizing the viewer
                 setTimeout(() => viewer?.resize(), 350);
             }
         }
