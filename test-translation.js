@@ -15,7 +15,7 @@ async function testTranslation() {
         console.log('✅ Token obtained');
 
         // Test with your URN
-        const urn = 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Ynpja29meW52ZTJ3NHJwem55bW9vYnlhZ3VxeGt3ZWwvMTc1NjU2NDk1NjkxMC1vdm9ET1NTSUVSJTIwQ09TVE8lMjAtJTIwcGxhbiUyMGVudHJlc29sLSUyMHByb2pldC0uZHhm';
+        const urn = 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Ynpja29meW52ZTJ3NHJwem55bW9vYnlhZ3VxeGt3ZWwvMTc1NjU2OTk4NDYyNS1hbnRlZW4uZHdn';
         
         const manifestResponse = await axios.get(`https://developer.api.autodesk.com/modelderivative/v2/designdata/${urn}/manifest`, {
             headers: { 'Authorization': `Bearer ${token}` }
