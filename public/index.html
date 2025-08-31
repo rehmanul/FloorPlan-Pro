@@ -2074,9 +2074,15 @@
                 
                 updateStatus('Processing CAD File', 'Translating to viewable format...');
                 
-                // Poll for completion
-                await pollForCompletion(currentUrn);
-                setProgress(60);
+                // Poll for completion with fallback
+                try {
+                    await pollForCompletion(currentUrn);
+                    setProgress(60);
+                } catch (pollError) {
+                    console.warn('Translation polling failed, attempting direct load:', pollError.message);
+                    setProgress(60);
+                    // Continue anyway - sometimes viewer can load even if polling fails
+                }
                 
                 // Analyze the floor plan using backend API
                 const analysisResponse = await fetch('/api/analyze', {
@@ -2101,27 +2107,54 @@
                     setProgress(80);
                 }
                 
-                // Initialize viewer
-                updateStatus('Loading 3D Model', 'Please wait...');
+                // Initialize viewer with retry logic
+                updateStatus('Loading 3D Model', 'Initializing viewer...');
                 
                 setTimeout(async () => {
-                    try {
-                        await initializeViewer(currentUrn);
-                        updateFloorPlanDetails();
-                        updateElementsList();
-                        switchView('3d');
-                        showNotification('Model loaded!', 'success');
-                    } catch (error) {
-                        console.error('Viewer error:', error);
-                        hideStatus();
-                        showNotification('Failed to load 3D model', 'error');
+                    let retryCount = 0;
+                    const maxRetries = 3;
+                    
+                    while (retryCount < maxRetries) {
+                        try {
+                            await initializeViewer(currentUrn);
+                            updateFloorPlanDetails();
+                            updateElementsList();
+                            switchView('3d');
+                            showNotification('Model loaded successfully!', 'success');
+                            return;
+                        } catch (error) {
+                            retryCount++;
+                            console.warn(`Viewer attempt ${retryCount} failed:`, error.message);
+                            
+                            if (retryCount >= maxRetries) {
+                                hideStatus();
+                                showNotification('3D viewer failed - using analysis data only', 'warning');
+                                // Still show analysis data even if 3D fails
+                                updateFloorPlanDetails();
+                                updateElementsList();
+                                switchView('analysis');
+                                return;
+                            }
+                            
+                            // Wait before retry
+                            await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
+                        }
                     }
                 }, 1000);
                 
             } catch (error) {
                 console.error('File processing error:', error);
-                updateStatus('Processing Error', error.message, true);
-                showNotification(`Processing failed: ${error.message}`, 'error');
+                hideStatus();
+                
+                if (error.message.includes('timeout')) {
+                    showNotification('File is taking longer than expected to process. This may be due to file size or complexity.', 'warning');
+                    // Offer alternative
+                    setTimeout(() => {
+                        showNotification('Try uploading a smaller DXF file or check your internet connection', 'info');
+                    }, 3000);
+                } else {
+                    showNotification(`Processing failed: ${error.message}`, 'error');
+                }
             }
         }
 
@@ -2831,7 +2864,7 @@
 
         // Polling for translation completion
         async function pollForCompletion(urn) {
-            const maxAttempts = 60;
+            const maxAttempts = 120; // Increased timeout
             let attempts = 0;
             
             return new Promise((resolve, reject) => {
@@ -2841,23 +2874,26 @@
                         const manifest = await response.json();
                         
                         console.log(`Translation status: ${manifest.status} (${manifest.progress})`);
+                        updateStatus('Processing CAD File', `Translation ${manifest.status} - ${manifest.progress}`);
                         
                         if (manifest.status === 'success') {
                             resolve(manifest);
                         } else if (manifest.status === 'failed') {
                             reject(new Error('Translation failed'));
                         } else if (attempts >= maxAttempts) {
-                            reject(new Error('Translation timeout'));
+                            reject(new Error('Translation timeout - file may be too large or complex'));
                         } else {
                             attempts++;
-                            setTimeout(poll, 5000);
+                            const delay = attempts < 10 ? 3000 : 8000; // Longer delays for later attempts
+                            setTimeout(poll, delay);
                         }
                     } catch (error) {
+                        console.error('Polling error:', error);
                         if (attempts >= maxAttempts) {
-                            reject(error);
+                            reject(new Error('Translation service unavailable'));
                         } else {
                             attempts++;
-                            setTimeout(poll, 5000);
+                            setTimeout(poll, 10000); // Longer delay on errors
                         }
                     }
                 };
