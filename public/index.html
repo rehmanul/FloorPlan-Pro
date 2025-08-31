@@ -2068,35 +2068,19 @@
                 }
                 
                 // Initialize 3D viewer
+                switchView('3d');
+                updateStatus('Loading 3D Model', 'Initializing Autodesk Viewer...');
+                
                 try {
                     await initializeViewer(currentUrn);
-                    console.log('✅ Viewer initialization complete');
-                    
-                    // Update UI
                     updateFloorPlanDetails();
                     updateElementsList();
-                    
                     setProgress(100);
-                    hideStatus();
-                    showNotification('CAD file processed successfully!', 'success');
-                    
-                    // Switch to 3D view and ensure viewer is visible
-                    switchView('3d');
-                    
-                    // Initialize advanced systems
-                    setTimeout(() => {
-                        initializeAdvancedSystems();
-                    }, 1000);
-                    
+                    showNotification('CAD file loaded successfully!', 'success');
                 } catch (viewerError) {
-                    console.error('❌ Viewer initialization failed:', viewerError);
-                    showNotification('3D viewer failed to load: ' + viewerError.message, 'warning');
-                    
-                    // Still update UI even if viewer fails
-                    updateFloorPlanDetails();
-                    updateElementsList();
-                    setProgress(100);
+                    console.error('Viewer failed:', viewerError);
                     hideStatus();
+                    showNotification('Viewer error: ' + viewerError.message, 'error');
                 }
                 
             } catch (error) {
@@ -2626,7 +2610,8 @@
         }
 
         function hideStatus() {
-            document.getElementById('statusOverlay').style.display = 'none';
+            const overlay = document.getElementById('statusOverlay');
+            if (overlay) overlay.style.display = 'none';
             setProgress(0);
         }
 
@@ -2679,9 +2664,7 @@
                 Autodesk.Viewing.Initializer(options, async () => {
                     try {
                         const viewerDiv = document.getElementById('forgeViewer');
-                        viewer = new Autodesk.Viewing.GuiViewer3D(viewerDiv, {
-                            extensions: ['Autodesk.DocumentBrowser']
-                        });
+                        viewer = new Autodesk.Viewing.GuiViewer3D(viewerDiv);
                         
                         const startedCode = viewer.start();
                         if (startedCode > 0) {
@@ -2695,41 +2678,41 @@
                         const documentId = `urn:${urn}`;
                         console.log('📄 Loading document:', documentId);
                         
-                        const doc = await loadDocument(documentId);
-                        const viewables = doc.getRoot().getDefaultGeometry();
+                        Autodesk.Viewing.Document.load(documentId, (doc) => {
+                            const viewables = doc.getRoot().getDefaultGeometry();
+                            
+                            if (viewables) {
+                                console.log('📐 Loading geometry...');
+                                viewer.loadDocumentNode(doc, viewables).then(() => {
+                                    console.log('✅ 3D model loaded successfully');
+                                    
+                                    // Setup viewer event listeners
+                                    viewer.addEventListener(Autodesk.Viewing.GEOMETRY_LOADED_EVENT, () => {
+                                        console.log('🎨 Geometry loaded, fitting to view');
+                                        viewer.fitToView();
+                                        hideStatus();
+                                        showNotification('Floor plan loaded successfully!', 'success');
+                                    });
+                                    
+                                    resolve(viewer);
+                                }).catch(reject);
+                            } else {
+                                reject(new Error('No viewable geometry found'));
+                            }
+                        }, (error) => {
+                            console.error('❌ Failed to load document:', error);
+                            reject(error);
+                        });
                         
-                        if (viewables) {
-                            console.log('📐 Loading geometry...');
-                            await viewer.loadDocumentNode(doc, viewables);
-                            console.log('✅ 3D model loaded successfully');
-                            
-                            // Setup viewer event listeners
-                            viewer.addEventListener(Autodesk.Viewing.SELECTION_CHANGED_EVENT, onSelectionChanged);
-                            viewer.addEventListener(Autodesk.Viewing.ISOLATE_EVENT, onIsolateEvent);
-                            viewer.addEventListener(Autodesk.Viewing.GEOMETRY_LOADED_EVENT, () => {
-                                console.log('🎨 Geometry loaded, fitting to view');
-                                viewer.fitToView();
-                                showNotification('Floor plan loaded successfully!', 'success');
-                            });
-                            
-                            resolve(viewer);
-                        } else {
-                            reject(new Error('No viewable geometry found'));
-                        }
                     } catch (error) {
-                        console.error('❌ Failed to load 3D model:', error);
-                        showNotification('Failed to load 3D model: ' + error.message, 'error');
+                        console.error('❌ Failed to initialize viewer:', error);
                         reject(error);
                     }
                 });
             });
         }
 
-        function loadDocument(documentId) {
-            return new Promise((resolve, reject) => {
-                Autodesk.Viewing.Document.load(documentId, resolve, reject);
-            });
-        }
+
 
         async function getForgeToken() {
             try {
@@ -3178,6 +3161,14 @@
                 showNotification('3D viewer not initialized', 'warning');
             }
         }
+        
+        // Suppress browser extension errors
+        window.addEventListener('error', function(e) {
+            if (e.filename && (e.filename.includes('content.js') || e.filename.includes('extension'))) {
+                e.preventDefault();
+                return false;
+            }
+        });
         
         // Initialize application on page load
         window.addEventListener('load', () => {
