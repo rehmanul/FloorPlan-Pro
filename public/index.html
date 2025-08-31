@@ -2215,6 +2215,13 @@
                     updateIlotsList();
                     updateAnalysisStats();
                     
+                    // Visualize îlots on 3D model with precise positioning
+                    if (viewer && viewer.model) {
+                        setTimeout(() => {
+                            visualizeIlotsOn3D();
+                        }, 500);
+                    }
+                    
                     setProgress(100);
                     hideStatus();
                     showNotification(`Generated ${generatedIlots.length} optimized îlots`, 'success');
@@ -2545,7 +2552,6 @@
                     break;
                     
                 case '3d':
-                    // 3D Autodesk Viewer - Shows actual CAD model
                     document.getElementById('walkthrough3dBtn').classList.add('active');
                     document.getElementById('floorPlanCanvas').style.display = 'none';
                     document.getElementById('forgeViewer').style.display = 'block';
@@ -2554,14 +2560,13 @@
                         viewer.resize();
                         setTimeout(() => {
                             viewer.fitToView();
-                            // Enable walkthrough mode
-                            if (viewer.getExtension) {
-                                const walkthrough = viewer.getExtension('Autodesk.Walkthrough');
-                                if (walkthrough) walkthrough.activate();
+                            // Refresh îlot overlays
+                            if (generatedIlots.length > 0) {
+                                visualizeIlotsOn3D();
                             }
-                        }, 100);
+                        }, 200);
                     }
-                    showNotification('3D View - Interactive CAD model', 'info', 2000);
+                    showNotification('3D View - Interactive CAD model with live îlots', 'info', 2000);
                     break;
                     
                 case 'export':
@@ -2733,6 +2738,18 @@
                             viewer.addEventListener(Autodesk.Viewing.GEOMETRY_LOADED_EVENT, function() {
                                 console.log('🎨 Geometry loaded - fitting to view');
                                 viewer.fitToView();
+                                
+                                // Apply color coding to elements
+                                applyElementColorCoding();
+                                
+                                // Show îlots if generated
+                                if (generatedIlots.length > 0) {
+                                    visualizeIlotsOn3D();
+                                }
+                                
+                                // Setup camera listener for overlay updates
+                                setupCameraListener();
+                                
                                 hideStatus();
                                 showNotification('3D model loaded successfully!', 'success');
                             });
@@ -2741,6 +2758,7 @@
                                 const selection = event.dbIdArray;
                                 if (selection.length > 0) {
                                     console.log('Selected object ID:', selection[0]);
+                                    highlightSelectedElement(selection[0]);
                                 }
                             });
                             
@@ -3219,6 +3237,392 @@
                 
             } else {
                 showNotification('3D viewer not initialized', 'warning');
+            }
+        }
+        
+        // 3D Visualization Functions
+        function applyElementColorCoding() {
+            if (!viewer || !viewer.model) return;
+            
+            // Get all object IDs
+            viewer.model.getObjectTree(function(tree) {
+                tree.enumNodeChildren(tree.getRootId(), function(dbId) {
+                    viewer.getProperties(dbId, function(props) {
+                        const layerName = getLayerName(props);
+                        const color = getColorForLayer(layerName);
+                        
+                        if (color) {
+                            viewer.setThemingColor(dbId, color);
+                        }
+                    });
+                }, true);
+            });
+        }
+        
+        function getLayerName(properties) {
+            for (let prop of properties.properties) {
+                if (prop.displayName.toLowerCase().includes('layer')) {
+                    return prop.displayValue.toLowerCase();
+                }
+            }
+            return '';
+        }
+        
+        function getColorForLayer(layerName) {
+            const colorMap = {
+                'wall': new THREE.Vector4(0.42, 0.45, 0.5, 1), // Gray
+                'door': new THREE.Vector4(0.94, 0.27, 0.27, 1), // Red
+                'window': new THREE.Vector4(0.2, 0.6, 0.9, 1), // Blue
+                'restricted': new THREE.Vector4(0.23, 0.51, 0.96, 1) // Blue
+            };
+            
+            for (let key in colorMap) {
+                if (layerName.includes(key)) {
+                    return colorMap[key];
+                }
+            }
+            return null;
+        }
+        
+        function visualizeIlotsOn3D() {
+            if (!viewer || !generatedIlots.length) return;
+            
+            console.log('🏢 Visualizing', generatedIlots.length, 'îlots on 3D model');
+            
+            // Create overlay for îlots
+            const overlayScene = new THREE.Scene();
+            
+            generatedIlots.forEach((ilot, index) => {
+                // Create îlot geometry
+                const geometry = new THREE.BoxGeometry(ilot.width || 2, ilot.height || 1.5, 0.1);
+                
+                // Color by type
+                const colors = {
+                    'Work': 0x10b981,
+                    'Meeting': 0x3b82f6,
+                    'Social': 0x8b5cf6,
+                    'Break': 0xf59e0b
+                };
+                
+                const material = new THREE.MeshBasicMaterial({ 
+                    color: colors[ilot.type] || 0x10b981,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                
+                const mesh = new THREE.Mesh(geometry, material);
+                
+                // Position îlot
+                mesh.position.set(
+                    (ilot.x || 0) + (ilot.width || 2) / 2,
+                    (ilot.y || 0) + (ilot.height || 1.5) / 2,
+                    0.05
+                );
+                
+                overlayScene.add(mesh);
+                
+                // Add label
+                const labelDiv = document.createElement('div');
+                labelDiv.className = 'ilot-label';
+                labelDiv.style.cssText = `
+                    position: absolute;
+                    background: rgba(16, 185, 129, 0.9);
+                    color: white;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    pointer-events: none;
+                    z-index: 1000;
+                `;
+                labelDiv.textContent = `${ilot.type} (${ilot.capacity})`;
+                
+                // Position label on screen
+                const screenPos = worldToScreen(mesh.position);
+                if (screenPos) {
+                    labelDiv.style.left = screenPos.x + 'px';
+                    labelDiv.style.top = screenPos.y + 'px';
+                    document.getElementById('forgeViewer').appendChild(labelDiv);
+                }
+            });
+            
+            // Add overlay to viewer
+            if (viewer.impl && viewer.impl.overlayScenes) {
+                viewer.impl.overlayScenes['ilots'] = overlayScene;
+                viewer.impl.invalidate(true);
+            }
+            
+            showNotification(`Visualized ${generatedIlots.length} îlots on 3D model`, 'success');
+        }
+        
+        function worldToScreen(worldPos) {
+            if (!viewer || !viewer.impl) return null;
+            
+            const camera = viewer.impl.camera;
+            const canvas = viewer.impl.canvas;
+            
+            const vector = new THREE.Vector3(worldPos.x, worldPos.y, worldPos.z);
+            vector.project(camera);
+            
+            return {
+                x: (vector.x + 1) / 2 * canvas.clientWidth,
+                y: -(vector.y - 1) / 2 * canvas.clientHeight
+            };
+        }
+        
+        function highlightSelectedElement(dbId) {
+            if (!viewer) return;
+            
+            viewer.getProperties(dbId, function(props) {
+                console.log('Selected element:', props.name);
+                
+                // Show properties in notification
+                const layerName = getLayerName(props);
+                showNotification(`Selected: ${props.name} (Layer: ${layerName})`, 'info', 3000);
+            });
+        }
+        
+        // 3D Visualization Functions for Precise Îlot Placement
+        function visualizeIlotsOn3D() {
+            if (!viewer || !generatedIlots.length) return;
+            
+            console.log('🏗️ Visualizing îlots on 3D model...');
+            
+            // Clear existing îlot overlays
+            clearIlotOverlays();
+            
+            generatedIlots.forEach((ilot, index) => {
+                createIlot3DOverlay(ilot, index);
+            });
+            
+            showNotification(`${generatedIlots.length} îlots visualized on 3D model`, 'success');
+        }
+        
+        function createIlot3DOverlay(ilot, index) {
+            // Convert îlot coordinates to 3D world coordinates
+            const worldPos = convertToWorldCoordinates(ilot.x, ilot.y, 0);
+            
+            // Create 3D markup for îlot
+            const markup = {
+                id: `ilot-${index}`,
+                position: worldPos,
+                type: 'rectangle',
+                width: ilot.width * 100, // Convert to viewer units
+                height: ilot.height * 100,
+                color: getIlotColor(ilot.type),
+                opacity: 0.7,
+                data: ilot
+            };
+            
+            // Add to viewer as overlay
+            addMarkupToViewer(markup);
+        }
+        
+        function convertToWorldCoordinates(x, y, z) {
+            // Convert floor plan coordinates to 3D world coordinates
+            // This needs to be calibrated based on your model's coordinate system
+            return {
+                x: x * 100, // Scale factor - adjust based on your model
+                y: y * 100,
+                z: z + 10   // Slightly above floor level
+            };
+        }
+        
+        function getIlotColor(type) {
+            const colors = {
+                'Work': '#10B981',      // Green
+                'Meeting': '#3B82F6',   // Blue
+                'Social': '#8B5CF6',    // Purple
+                'Break': '#F59E0B'      // Orange
+            };
+            return colors[type] || '#10B981';
+        }
+        
+        function addMarkupToViewer(markup) {
+            // Create HTML overlay element
+            const overlay = document.createElement('div');
+            overlay.id = markup.id;
+            overlay.style.cssText = `
+                position: absolute;
+                width: ${markup.width}px;
+                height: ${markup.height}px;
+                background: ${markup.color};
+                opacity: ${markup.opacity};
+                border: 2px solid #fff;
+                border-radius: 4px;
+                pointer-events: auto;
+                cursor: pointer;
+                z-index: 1000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+            `;
+            
+            overlay.innerHTML = `
+                <div>
+                    ${markup.data.type}<br>
+                    Cap: ${markup.data.capacity}
+                </div>
+            `;
+            
+            // Add click handler
+            overlay.onclick = () => {
+                showIlotDetails(markup.data);
+            };
+            
+            // Position overlay on screen
+            const screenPos = worldToScreen(markup.position);
+            if (screenPos) {
+                overlay.style.left = (screenPos.x - markup.width/2) + 'px';
+                overlay.style.top = (screenPos.y - markup.height/2) + 'px';
+                
+                document.getElementById('forgeViewer').appendChild(overlay);
+                
+                // Store reference for updates
+                if (!window.ilotOverlays) window.ilotOverlays = [];
+                window.ilotOverlays.push({
+                    element: overlay,
+                    worldPos: markup.position,
+                    data: markup.data
+                });
+            }
+        }
+        
+        function worldToScreen(worldPos) {
+            if (!viewer || !viewer.impl) return null;
+            
+            try {
+                const screenPos = viewer.impl.worldToClient(new THREE.Vector3(worldPos.x, worldPos.y, worldPos.z));
+                return { x: screenPos.x, y: screenPos.y };
+            } catch (error) {
+                console.log('World to screen conversion failed:', error);
+                return null;
+            }
+        }
+        
+        function clearIlotOverlays() {
+            if (window.ilotOverlays) {
+                window.ilotOverlays.forEach(overlay => {
+                    if (overlay.element.parentNode) {
+                        overlay.element.parentNode.removeChild(overlay.element);
+                    }
+                });
+                window.ilotOverlays = [];
+            }
+        }
+        
+        function showIlotDetails(ilot) {
+            const details = `
+                <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 300px;">
+                    <h4 style="margin: 0 0 10px 0; color: #2563eb;">${ilot.type} Îlot</h4>
+                    <div><strong>Capacity:</strong> ${ilot.capacity} people</div>
+                    <div><strong>Dimensions:</strong> ${ilot.width}m × ${ilot.height}m</div>
+                    <div><strong>Area:</strong> ${(ilot.width * ilot.height).toFixed(1)}m²</div>
+                    <div><strong>Position:</strong> X:${ilot.x.toFixed(1)}, Y:${ilot.y.toFixed(1)}</div>
+                    <div><strong>Room:</strong> ${ilot.roomName || 'N/A'}</div>
+                    <button onclick="this.parentElement.parentElement.remove()" style="margin-top: 10px; padding: 5px 10px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
+                </div>
+            `;
+            
+            const popup = document.createElement('div');
+            popup.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                z-index: 2000;
+            `;
+            popup.innerHTML = details;
+            
+            document.getElementById('forgeViewer').appendChild(popup);
+        }
+        
+        function applyElementColorCoding() {
+            if (!viewer || !viewer.model) return;
+            
+            console.log('🎨 Applying element color coding...');
+            
+            // Get all object IDs in the model
+            viewer.model.getObjectTree(function(objectTree) {
+                objectTree.enumNodeChildren(objectTree.getRootId(), function(dbId) {
+                    viewer.getProperties(dbId, function(props) {
+                        const color = getElementColor(props);
+                        if (color) {
+                            viewer.setThemingColor(dbId, color);
+                        }
+                    });
+                }, true);
+            });
+        }
+        
+        function getElementColor(properties) {
+            const name = properties.name?.toLowerCase() || '';
+            const category = getCategoryFromProperties(properties);
+            
+            // Color coding based on element type
+            if (category === 'wall' || name.includes('wall')) {
+                return new THREE.Vector4(0.42, 0.45, 0.5, 1); // Gray for walls
+            } else if (category === 'door' || name.includes('door')) {
+                return new THREE.Vector4(0.94, 0.27, 0.27, 1); // Red for doors
+            } else if (category === 'window' || name.includes('window')) {
+                return new THREE.Vector4(0.23, 0.51, 0.96, 1); // Blue for windows
+            } else if (category === 'floor' || name.includes('floor')) {
+                return new THREE.Vector4(0.9, 0.9, 0.9, 1); // Light gray for floors
+            }
+            
+            return null; // Keep original color
+        }
+        
+        function getCategoryFromProperties(properties) {
+            for (let prop of properties.properties) {
+                if (prop.displayName === 'Category' || prop.displayName === 'Type') {
+                    return prop.displayValue.toLowerCase();
+                }
+            }
+            return '';
+        }
+        
+        function highlightSelectedElement(dbId) {
+            viewer.getProperties(dbId, function(props) {
+                const info = `
+                    <div style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 6px; max-width: 250px; z-index: 1500;">
+                        <h5 style="margin: 0 0 8px 0;">${props.name}</h5>
+                        ${props.properties.slice(0, 5).map(p => `<div><strong>${p.displayName}:</strong> ${p.displayValue}</div>`).join('')}
+                        <button onclick="this.parentElement.remove()" style="margin-top: 8px; padding: 4px 8px; background: #fff; color: #000; border: none; border-radius: 3px; cursor: pointer;">×</button>
+                    </div>
+                `;
+                
+                // Remove existing info panels
+                document.querySelectorAll('#forgeViewer > div[style*="position: absolute"]').forEach(el => {
+                    if (el.innerHTML.includes('displayName')) el.remove();
+                });
+                
+                const infoPanel = document.createElement('div');
+                infoPanel.innerHTML = info;
+                document.getElementById('forgeViewer').appendChild(infoPanel);
+            });
+        }
+        
+        // Update îlot positions when camera moves
+        function updateIlotOverlayPositions() {
+            if (!window.ilotOverlays || !viewer) return;
+            
+            window.ilotOverlays.forEach(overlay => {
+                const screenPos = worldToScreen(overlay.worldPos);
+                if (screenPos) {
+                    overlay.element.style.left = (screenPos.x - overlay.element.offsetWidth/2) + 'px';
+                    overlay.element.style.top = (screenPos.y - overlay.element.offsetHeight/2) + 'px';
+                }
+            });
+        }
+        
+        // Set up camera change listener for overlay updates
+        function setupCameraListener() {
+            if (viewer && viewer.navigation) {
+                viewer.navigation.addEventListener('cameraChanged', updateIlotOverlayPositions);
             }
         }
         
