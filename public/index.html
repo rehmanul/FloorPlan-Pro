@@ -630,6 +630,7 @@
                     <div id="statusOverlay" class="status-overlay">
                         <div id="statusText" class="status-text">FloorPlan Pro Ready</div>
                         <div id="statusSubText" class="status-sub-text">Upload a DXF, DWG, RVT, IFC, or PDF file to begin professional CAD analysis.</div>
+                        <button onclick="forceHideStatus()" style="margin-top: 20px; padding: 10px 20px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer;">Force Close</button>
                     </div>
                 </div>
             </div>
@@ -2109,6 +2110,7 @@
                 
                 // Initialize viewer with retry logic
                 updateStatus('Loading 3D Model', 'Initializing viewer...');
+                setupStatusTimeout(); // Auto-hide after 30 seconds
                 
                 setTimeout(async () => {
                     let retryCount = 0;
@@ -2117,6 +2119,10 @@
                     while (retryCount < maxRetries) {
                         try {
                             await initializeViewer(currentUrn);
+                            
+                            // FORCE HIDE STATUS
+                            hideStatus();
+                            
                             updateFloorPlanDetails();
                             updateElementsList();
                             switchView('3d');
@@ -2681,7 +2687,10 @@
 
         function hideStatus() {
             const overlay = document.getElementById('statusOverlay');
-            if (overlay) overlay.style.display = 'none';
+            if (overlay) {
+                overlay.style.display = 'none';
+                overlay.style.visibility = 'hidden';
+            }
             setProgress(0);
         }
 
@@ -2772,6 +2781,10 @@
                                 console.log('🎨 Geometry loaded - fitting to view');
                                 viewer.fitToView();
                                 
+                                // FORCE HIDE STATUS OVERLAY
+                                const overlay = document.getElementById('statusOverlay');
+                                if (overlay) overlay.style.display = 'none';
+                                
                                 // Apply color coding to elements
                                 applyElementColorCoding();
                                 
@@ -2783,7 +2796,6 @@
                                 // Setup camera listener for overlay updates
                                 setupCameraListener();
                                 
-                                hideStatus();
                                 showNotification('3D model loaded successfully!', 'success');
                             });
                             
@@ -2794,6 +2806,10 @@
                                     highlightSelectedElement(selection[0]);
                                 }
                             });
+                            
+                            // FORCE HIDE STATUS IMMEDIATELY
+                            const statusOverlay = document.getElementById('statusOverlay');
+                            if (statusOverlay) statusOverlay.style.display = 'none';
                             
                             resolve(viewer);
                             
@@ -3670,10 +3686,32 @@
             }
         });
         
+        // Force hide status function
+        function forceHideStatus() {
+            const overlay = document.getElementById('statusOverlay');
+            if (overlay) {
+                overlay.style.display = 'none';
+                overlay.style.visibility = 'hidden';
+            }
+            showNotification('Status overlay cleared', 'info');
+        }
+        
+        // Auto-hide status after 30 seconds
+        function setupStatusTimeout() {
+            setTimeout(() => {
+                const overlay = document.getElementById('statusOverlay');
+                if (overlay && overlay.style.display !== 'none') {
+                    console.log('Auto-hiding stuck status overlay');
+                    forceHideStatus();
+                }
+            }, 30000);
+        }
+        
         // Initialize application on page load
         window.addEventListener('load', () => {
             console.log('FloorPlan Pro - Production CAD Analysis Engine Loaded');
             showNotification('FloorPlan Pro ready for professional CAD analysis', 'success');
+            setupStatusTimeout();
         });
     </script>
 </body>
