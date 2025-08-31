@@ -6,6 +6,8 @@ class AutodeskDesignExtractor {
     constructor() {
         this.clientId = process.env.APS_CLIENT_ID;
         this.clientSecret = process.env.APS_CLIENT_SECRET;
+        this.derivativesApi = null; // Initialize to prevent undefined errors
+        this.authClient = null;
     }
 
     async getToken() {
@@ -18,15 +20,27 @@ class AutodeskDesignExtractor {
 
     // Extract complete design data from Autodesk model
     async extractDesignData(urn) {
+        if (!urn) {
+            throw new Error('URN is required for design extraction');
+        }
+        
+        if (!this.clientId || !this.clientSecret) {
+            throw new Error('APS credentials not configured');
+        }
+        
         try {
-            const credentials = await this.authClient.authenticate();
+            // Use axios-based API calls instead of undefined derivativesApi
+            const token = await this.getToken();
+            if (!token) {
+                throw new Error('Failed to obtain access token');
+            }
             
-            // Get model metadata
-            const metadata = await this.derivativesApi.getMetadata(urn, {}, credentials);
+            // Get model metadata using direct API calls
+            const metadata = await this.getMetadata(urn, token);
             
             // Get model hierarchy and properties
-            const hierarchy = await this.getModelHierarchy(urn, credentials);
-            const properties = await this.getAllProperties(urn, credentials);
+            const hierarchy = await this.getModelHierarchy(urn, token);
+            const properties = await this.getAllProperties(urn, token);
             
             // Extract design elements
             const designData = {
@@ -49,10 +63,13 @@ class AutodeskDesignExtractor {
     }
 
     // Get model hierarchy from Autodesk
-    async getModelHierarchy(urn, credentials) {
+    async getModelHierarchy(urn, token) {
         try {
-            const manifest = await this.derivativesApi.getManifest(urn, {}, credentials);
-            const derivatives = manifest.body.derivatives;
+            const response = await axios.get(
+                `https://developer.api.autodesk.com/modelderivative/v2/designdata/${urn}/manifest`,
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+            const derivatives = response.data.derivatives;
             
             if (derivatives && derivatives.length > 0) {
                 const derivative = derivatives.find(d => d.outputType === 'svf') || derivatives[0];
@@ -72,16 +89,19 @@ class AutodeskDesignExtractor {
     }
 
     // Get all properties from Autodesk model
-    async getAllProperties(urn, credentials) {
+    async getAllProperties(urn, token) {
         try {
-            const manifest = await this.derivativesApi.getManifest(urn, {}, credentials);
-            const derivatives = manifest.body.derivatives;
+            const response = await axios.get(
+                `https://developer.api.autodesk.com/modelderivative/v2/designdata/${urn}/manifest`,
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+            const derivatives = response.data.derivatives;
             
             if (derivatives && derivatives.length > 0) {
                 const derivative = derivatives.find(d => d.outputType === 'svf') || derivatives[0];
                 if (derivative.guid) {
                     // In real implementation, use Model Derivative API to get properties
-                    return await this.fetchModelProperties(urn, derivative.guid, credentials);
+                    return await this.fetchModelProperties(urn, derivative.guid, token);
                 }
             }
             
@@ -94,17 +114,31 @@ class AutodeskDesignExtractor {
     }
 
     // Fetch detailed model properties using Autodesk API
-    async fetchModelProperties(urn, guid, credentials) {
+    async fetchModelProperties(urn, guid, token) {
         // This would use the actual Autodesk Model Derivative API
         // For now, simulating the structure that Autodesk returns
         return {
-            objectTree: await this.getObjectTree(urn, guid, credentials),
-            properties: await this.getObjectProperties(urn, guid, credentials)
+            objectTree: await this.getObjectTree(urn, guid, token),
+            properties: await this.getObjectProperties(urn, guid, token)
         };
+    }
+    
+    // Get metadata from Autodesk API
+    async getMetadata(urn, token) {
+        try {
+            const response = await axios.get(
+                `https://developer.api.autodesk.com/modelderivative/v2/designdata/${urn}/metadata`,
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Failed to get metadata:', error);
+            return { data: { metadata: [] } };
+        }
     }
 
     // Get object tree from Autodesk
-    async getObjectTree(urn, guid, credentials) {
+    async getObjectTree(urn, guid, token) {
         // Autodesk API call to get object tree
         // Returns hierarchical structure of all objects in the model
         return {
@@ -121,7 +155,7 @@ class AutodeskDesignExtractor {
     }
 
     // Get object properties from Autodesk
-    async getObjectProperties(urn, guid, credentials) {
+    async getObjectProperties(urn, guid, token) {
         // Autodesk API call to get detailed properties for each object
         return {
             collection: [
