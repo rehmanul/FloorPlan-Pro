@@ -12,6 +12,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Import DXF processor
+const DxfProcessor = require('./src/dxf-processor');
+
+// Import placement engines
+const IlotPlacementEngine = require('./src/ilot-placement-engine');
+const CorridorGenerator = require('./src/corridor-generator');
+
 // --- CONFIGURATION & VALIDATION ---
 const APS_CLIENT_ID = process.env.APS_CLIENT_ID;
 const APS_CLIENT_SECRET = process.env.APS_CLIENT_SECRET;
@@ -272,6 +279,184 @@ app.post('/api/ilots', async (req, res) => {
     }
 });
 
+// --- ADVANCED PLACEMENT ENDPOINTS ---
+app.post('/api/advanced-placement', async (req, res) => {
+    const { floorPlan, options = {} } = req.body;
+    
+    if (!floorPlan) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Floor plan data is required for advanced placement' 
+        });
+    }
+    
+    console.log(`🏗️ Starting advanced îlot placement with options:`, options);
+    
+    try {
+        // Initialize placement engine
+        const placementEngine = new IlotPlacementEngine({
+            minWallDistance: options.wallBuffer || 0.5,
+            minIlotDistance: options.minDistance || 2.0,
+            defaultIlotSize: { 
+                width: options.ilotWidth || 3.0, 
+                height: options.ilotHeight || 2.0 
+            },
+            maxIterations: options.maxAttempts || 1000,
+            debugMode: process.env.NODE_ENV === 'development'
+        });
+        
+        // Generate optimized placement
+        const placedIlots = await placementEngine.generateOptimizedPlacement(floorPlan, options);
+        
+        // Format results for frontend
+        const formattedIlots = placedIlots.map(ilot => ({
+            id: ilot.id,
+            position: ilot.position,
+            dimensions: ilot.dimensions,
+            properties: {
+                type: ilot.type || 'workspace',
+                capacity: ilot.capacity || 4,
+                equipment: ilot.equipment || []
+            },
+            validation: {
+                isValid: ilot.isValid !== false,
+                clearance: ilot.clearance || 'adequate',
+                issues: ilot.issues || []
+            },
+            metadata: {
+                score: ilot.score || 0.8,
+                created: new Date().toISOString()
+            }
+        }));
+        
+        console.log(`✅ Advanced placement completed: ${formattedIlots.length} îlots placed`);
+        
+        res.json({
+            success: true,
+            ilots: formattedIlots,
+            statistics: {
+                totalIlots: formattedIlots.length,
+                validIlots: formattedIlots.filter(i => i.validation.isValid).length,
+                averageScore: formattedIlots.reduce((sum, i) => sum + i.metadata.score, 0) / formattedIlots.length,
+                coverage: options.coverage || 0.3
+            },
+            metadata: {
+                engine: 'advanced-placement-engine',
+                version: '1.0.0',
+                processedAt: new Date().toISOString()
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Advanced placement failed:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Advanced placement failed',
+            details: error.message,
+            fallback: 'Consider using basic placement mode'
+        });
+    }
+});
+
+app.post('/api/corridor-generation', async (req, res) => {
+    const { floorPlan, ilots = [], options = {} } = req.body;
+    
+    if (!floorPlan) {
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Floor plan data is required for corridor generation' 
+        });
+    }
+    
+    console.log(`🛤️ Starting advanced corridor generation with ${ilots.length} îlots`);
+    
+    try {
+        // Initialize corridor generator
+        const corridorGenerator = new CorridorGenerator({
+            defaultWidth: options.width || 1.8,
+            minWidth: options.minWidth || 1.5,
+            maxWidth: options.maxWidth || 3.0,
+            gridResolution: options.gridResolution || 0.5,
+            debugMode: process.env.NODE_ENV === 'development'
+        });
+        
+        // Prepare allowed space (exclude walls and forbidden zones)
+        // For now, use the entire floor plan area - the corridor generator will handle obstacles
+        const allowedSpace = floorPlan.boundary || [];
+        
+        // If no boundary, create one from floor plan dimensions
+        if (!allowedSpace.length && floorPlan.bounds) {
+            const { minX, minY, maxX, maxY } = floorPlan.bounds;
+            allowedSpace.push(
+                [minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY]
+            );
+        }
+        
+        // Generate destinations from îlots and entrances
+        const destinations = [
+            ...ilots.map(ilot => ({ 
+                position: ilot.position, 
+                type: 'ilot', 
+                id: ilot.id 
+            })),
+            ...(floorPlan.entrances || []).map(entrance => ({ 
+                position: entrance.position, 
+                type: 'entrance', 
+                id: entrance.id 
+            }))
+        ];
+        
+        // Generate corridor network
+        const corridors = await corridorGenerator.generateCorridorNetwork(
+            floorPlan, 
+            allowedSpace, 
+            destinations
+        );
+        
+        // Format results for frontend
+        const formattedCorridors = corridors.map(corridor => ({
+            id: corridor.id,
+            name: corridor.name || `Corridor ${corridor.id}`,
+            polygon: corridor.polygon,
+            width: corridor.width,
+            length: corridor.length,
+            type: corridor.type || 'secondary',
+            accessibility: corridor.accessibility !== false,
+            metadata: {
+                created: new Date().toISOString(),
+                algorithm: 'a-star-pathfinding'
+            }
+        }));
+        
+        console.log(`✅ Corridor generation completed: ${formattedCorridors.length} corridors`);
+        
+        res.json({
+            success: true,
+            corridors: formattedCorridors,
+            statistics: {
+                totalCorridors: formattedCorridors.length,
+                totalLength: formattedCorridors.reduce((sum, c) => sum + (c.length || 0), 0),
+                averageWidth: formattedCorridors.reduce((sum, c) => sum + c.width, 0) / formattedCorridors.length,
+                accessibleCorridors: formattedCorridors.filter(c => c.accessibility).length
+            },
+            metadata: {
+                engine: 'corridor-generator',
+                version: '1.0.0',
+                processedAt: new Date().toISOString()
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Corridor generation failed:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'Corridor generation failed',
+            details: error.message,
+            fallback: 'Consider using basic corridor mode'
+        });
+    }
+});
+
 app.post('/api/corridors', async (req, res) => {
     const { urn } = req.body;
     console.log(`🛤️ Generating corridor paths for URN: ${urn?.substring(0, 20)}...`);
@@ -332,6 +517,121 @@ app.post('/api/corridors', async (req, res) => {
             success: false,
             error: 'Corridor generation failed', 
             details: error.message 
+        });
+    }
+});
+
+// --- DXF IMPORT/EXPORT ENDPOINTS ---
+app.post('/api/dxf/import', upload.single('file'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No DXF file uploaded' });
+    }
+
+    console.log(`📐 Processing DXF import: ${req.file.originalname}`);
+    
+    try {
+        // Initialize DXF processor
+        const dxfProcessor = new DxfProcessor({
+            debugMode: process.env.NODE_ENV === 'development',
+            validateGeometry: true,
+            strictMode: false
+        });
+        
+        // Read uploaded file
+        const fileContent = await fs.promises.readFile(req.file.path);
+        
+        // Parse DXF file
+        const result = await dxfProcessor.parseDxfFile(fileContent);
+        
+        // Clean up uploaded file
+        await fs.promises.unlink(req.file.path);
+        
+        console.log(`✅ DXF import completed: ${result.floorPlan.walls?.length || 0} walls, ${result.floorPlan.redZones?.length || 0} red zones, ${result.floorPlan.blueZones?.length || 0} blue zones`);
+        
+        res.json({
+            success: true,
+            floorPlan: result.floorPlan,
+            metadata: result.metadata,
+            statistics: result.statistics,
+            errors: result.errors,
+            warnings: result.warnings
+        });
+        
+    } catch (error) {
+        console.error('❌ DXF import failed:', error.message);
+        
+        // Clean up uploaded file on error
+        try {
+            await fs.promises.unlink(req.file.path);
+        } catch (cleanupError) {
+            console.error('Failed to cleanup uploaded file:', cleanupError.message);
+        }
+        
+        res.status(500).json({
+            success: false,
+            error: 'DXF import failed',
+            details: error.message
+        });
+    }
+});
+
+app.post('/api/dxf/export', async (req, res) => {
+    const { floorPlan, options = {} } = req.body;
+    
+    if (!floorPlan) {
+        return res.status(400).json({ error: 'Floor plan data is required for export' });
+    }
+    
+    console.log('📐 Generating DXF export...');
+    
+    try {
+        // Initialize DXF processor
+        const dxfProcessor = new DxfProcessor({
+            debugMode: process.env.NODE_ENV === 'development',
+            ...options
+        });
+        
+        // Generate DXF content
+        const dxfContent = await dxfProcessor.generateDxfFile(floorPlan, options);
+        
+        // Set appropriate headers for file download
+        const filename = options.filename || `floorplan_${Date.now()}.dxf`;
+        
+        res.setHeader('Content-Type', 'application/dxf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', Buffer.byteLength(dxfContent, 'utf8'));
+        
+        console.log(`✅ DXF export completed: ${dxfContent.length} characters`);
+        res.send(dxfContent);
+        
+    } catch (error) {
+        console.error('❌ DXF export failed:', error.message);
+        res.status(500).json({
+            success: false,
+            error: 'DXF export failed',
+            details: error.message
+        });
+    }
+});
+
+app.get('/api/dxf/layers', (req, res) => {
+    try {
+        // Return available layer mappings
+        const dxfProcessor = new DxfProcessor();
+        const layerMappings = dxfProcessor.config.layerMapping;
+        
+        res.json({
+            success: true,
+            layers: Object.keys(layerMappings),
+            mappings: layerMappings,
+            supportedTypes: ['WALLS', 'RED_ZONE', 'BLUE_ZONE', 'ILOTS', 'CORRIDORS', 'ANNOTATIONS', 'DIMENSIONS']
+        });
+        
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: 'Failed to get layer information',
+            details: error.message
         });
     }
 });

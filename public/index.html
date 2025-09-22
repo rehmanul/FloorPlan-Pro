@@ -492,12 +492,12 @@
                 </div>
                 <div class="panel-content">
                     <div class="section">
-                        <h4>File Processing</h4>
-                        <button id="parseCADBtn" class="btn btn-primary">
-                            <i class="fas fa-file-alt"></i> Parse CAD Layers
+                        <h4>DXF File Processing</h4>
+                        <button id="importDxfBtn" class="btn btn-primary">
+                            <i class="fas fa-file-import"></i> Import DXF
                         </button>
-                        <button id="detectElementsBtn" class="btn btn-secondary">
-                            <i class="fas fa-search"></i> Detect Elements
+                        <button id="exportDxfBtn" class="btn btn-secondary">
+                            <i class="fas fa-file-export"></i> Export DXF
                         </button>
                     </div>
 
@@ -522,6 +522,9 @@
                         </button>
                         <button id="optimizePathsBtn" class="btn btn-secondary">
                             <i class="fas fa-project-diagram"></i> Optimize Paths
+                        </button>
+                        <button id="validatePlacementBtn" class="btn btn-success" style="margin-top: 10px;">
+                            <i class="fas fa-check-circle"></i> Validate Placement
                         </button>
                     </div>
 
@@ -569,17 +572,11 @@
                     </div>
                 </div>
                 <div class="header-center">
-                    <button id="renderViewBtn" class="header-btn active">
-                        <i class="fas fa-eye"></i> Render View
+                    <button id="autodeskViewBtn" class="header-btn active">
+                        <i class="fas fa-cube"></i> Autodesk SDK View
                     </button>
-                    <button id="analysisViewBtn" class="header-btn">
-                        <i class="fas fa-chart-line"></i> Analysis
-                    </button>
-                    <button id="walkthrough3dBtn" class="header-btn">
-                        <i class="fas fa-walking"></i> 3D View
-                    </button>
-                    <button id="exportViewBtn" class="header-btn">
-                        <i class="fas fa-download"></i> Export
+                    <button id="canvasViewBtn" class="header-btn">
+                        <i class="fas fa-draw-polygon"></i> Manual Canvas View
                     </button>
                 </div>
                 <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
@@ -2024,9 +2021,9 @@
                 }
             });
 
-            // CAD processing
-            document.getElementById('parseCADBtn').addEventListener('click', parseCADLayers);
-            document.getElementById('detectElementsBtn').addEventListener('click', detectArchitecturalElements);
+            // DXF processing
+            document.getElementById('importDxfBtn').addEventListener('click', importDxfFile);
+            document.getElementById('exportDxfBtn').addEventListener('click', exportDxfFile);
 
             // Îlot generation
             document.getElementById('coverageSlider').addEventListener('input', updateCoverageValue);
@@ -2037,6 +2034,9 @@
             document.getElementById('corridorWidthSlider').addEventListener('input', updateCorridorWidthValue);
             document.getElementById('generateCorridorsBtn').addEventListener('click', generateCorridors);
             document.getElementById('optimizePathsBtn').addEventListener('click', optimizePaths);
+            
+            // Validation
+            document.getElementById('validatePlacementBtn').addEventListener('click', runComprehensiveValidation);
 
             // Export functions
             document.getElementById('exportPDFBtn').addEventListener('click', exportToPDF);
@@ -2045,10 +2045,8 @@
             document.getElementById('export3DBtn').addEventListener('click', exportTo3D);
 
             // View controls
-            document.getElementById('renderViewBtn').addEventListener('click', () => switchView('render'));
-            document.getElementById('analysisViewBtn').addEventListener('click', () => switchView('analysis'));
-            document.getElementById('walkthrough3dBtn').addEventListener('click', toggle3DWalkthrough);
-            document.getElementById('exportViewBtn').addEventListener('click', () => switchView('export'));
+            document.getElementById('autodeskViewBtn').addEventListener('click', () => switchToAutodeskView());
+            document.getElementById('canvasViewBtn').addEventListener('click', () => switchToCanvasView());
         }
 
         async function handleFileUpload(file) {
@@ -2164,95 +2162,73 @@
             }
         }
 
-        async function parseCADLayers() {
-            if (!currentFloorPlan) {
-                showNotification('Please upload a CAD file first', 'warning');
-                return;
-            }
-
-            updateStatus('Parsing CAD Layers', 'Analyzing layer structure...');
-            showNotification('Advanced layer parsing in progress...', 'info');
-
-            try {
-                // Simulate layer parsing with current data
-                const layerInfo = {
-                    walls: currentFloorPlan.walls?.length || 0,
-                    doors: currentFloorPlan.doors?.length || 0,
-                    windows: currentFloorPlan.windows?.length || 0,
-                    restricted: currentFloorPlan.restrictedAreas?.length || 0
-                };
-
-                updateElementsList();
-                hideStatus();
-                showNotification(`Layers parsed: ${Object.values(layerInfo).reduce((a, b) => a + b, 0)} elements found`, 'success');
-            } catch (error) {
-                hideStatus();
-                showNotification('Layer parsing failed: ' + error.message, 'error');
-            }
-        }
-
-        async function detectArchitecturalElements() {
-            if (!currentFloorPlan) {
-                showNotification('Please upload a CAD file first', 'warning');
-                return;
-            }
-
-            updateStatus('Detecting Elements', 'Using AI to classify architectural components...');
-            showNotification('AI-powered element detection running...', 'info');
-
-            try {
-                // Simulate element detection with mock data
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
-                detectedElements = {
-                    walls: currentFloorPlan.walls || [],
-                    doors: currentFloorPlan.doors || [],
-                    windows: currentFloorPlan.windows || [],
-                    restrictedAreas: currentFloorPlan.restrictedAreas || []
-                };
-
-                updateElementsList();
-                
-                hideStatus();
-                const totalElements = Object.values(detectedElements).reduce((sum, arr) => sum + arr.length, 0);
-                showNotification(`Detection complete: ${totalElements} elements classified`, 'success');
-            } catch (error) {
-                hideStatus();
-                showNotification('Element detection failed: ' + error.message, 'error');
-            }
-        }
 
         async function generateIlots() {
-            if (!currentUrn) {
-                showNotification('Please upload a CAD file first', 'warning');
+            if (!currentFloorPlan) {
+                showNotification('Please upload a DXF file or CAD file first', 'warning');
                 return;
             }
 
             const coverage = document.getElementById('coverageSlider').value / 100;
             const minDistance = 1.0;
             
-            updateStatus('Generating Îlots', `Creating ${coverage * 100}% coverage layout...`);
-            showNotification('Intelligent îlot placement in progress...', 'info');
+            updateStatus('Generating Îlots', `Creating ${coverage * 100}% coverage layout using advanced placement algorithms...`);
+            showNotification('Advanced geometric îlot placement in progress...', 'info');
             setProgress(30);
 
             try {
-                const response = await fetch('/api/ilots', {
+                // Use our new advanced placement engine
+                const placementData = {
+                    floorPlan: currentFloorPlan,
+                    options: {
+                        coverage: coverage,
+                        minDistance: minDistance,
+                        ilotWidth: 3.0,
+                        ilotHeight: 2.0,
+                        maxAttempts: 1000,
+                        wallBuffer: 0.5,
+                        entranceBuffer: 1.0
+                    }
+                };
+                
+                setProgress(50);
+                
+                // Call our advanced placement engine API
+                const response = await fetch('/api/advanced-placement', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        urn: currentUrn, 
-                        density: coverage,
-                        minDistance: minDistance
-                    })
+                    body: JSON.stringify(placementData)
                 });
                 
-                if (response.ok) {
-                    const result = await response.json();
-                    generatedIlots = result.ilots;
+                if (!response.ok) {
+                    throw new Error(`Placement engine failed: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    generatedIlots = result.ilots.map(ilot => ({
+                        id: ilot.id,
+                        x: ilot.position.x,
+                        y: ilot.position.y,
+                        width: ilot.dimensions.width,
+                        height: ilot.dimensions.height,
+                        type: ilot.properties.type || 'workspace',
+                        capacity: ilot.properties.capacity || 4,
+                        isValid: ilot.validation.isValid,
+                        clearance: ilot.validation.clearance
+                    }));
+                    
                     setProgress(80);
                     
                     updateIlotsList();
                     updateAnalysisStats();
+                    
+                    // Refresh canvas render
+                    if (canvas && canvas.render) {
+                        canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
+                        canvas.fitToView();
+                    }
                     
                     // Visualize îlots on 3D model with precise positioning
                     if (viewer && viewer.model) {
@@ -2263,14 +2239,82 @@
                     
                     setProgress(100);
                     hideStatus();
-                    showNotification(`Generated ${generatedIlots.length} optimized îlots`, 'success');
+                    
+                    const validIlots = generatedIlots.filter(ilot => ilot.isValid).length;
+                    showNotification(`Generated ${validIlots}/${generatedIlots.length} geometrically valid îlots (${(coverage * 100).toFixed(1)}% coverage)`, 'success');
+                    
+                    // Run comprehensive validation
+                    setTimeout(() => {
+                        const validationResults = runComprehensiveValidation();
+                        console.log('🔍 Post-generation validation:', validationResults);
+                    }, 1000);
+                    
+                    // Show placement statistics
+                    console.log('Placement Statistics:', {
+                        totalAttempts: result.statistics?.totalAttempts || 0,
+                        successfulPlacements: validIlots,
+                        collisionDetections: result.statistics?.collisionDetections || 0,
+                        averageClearance: result.statistics?.averageClearance || 0
+                    });
+                    
                 } else {
-                    throw new Error('Failed to generate îlots');
+                    throw new Error(result.error || 'Advanced placement failed');
                 }
+                
             } catch (error) {
                 hideStatus();
-                showNotification('Îlot generation failed: ' + error.message, 'error');
+                console.error('Advanced îlot placement failed:', error);
+                showNotification(`Advanced îlot placement failed: ${error.message}`, 'error');
+                
+                // Fallback to simple placement if advanced fails
+                try {
+                    showNotification('Attempting fallback placement method...', 'info');
+                    generatedIlots = generateSimpleFallbackIlots(currentFloorPlan, coverage);
+                    
+                    if (canvas && canvas.render) {
+                        canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
+                        canvas.fitToView();
+                    }
+                    
+                    updateIlotsList();
+                    updateAnalysisStats();
+                    
+                    showNotification(`Fallback placement: Generated ${generatedIlots.length} basic îlots`, 'warning');
+                } catch (fallbackError) {
+                    showNotification('All placement methods failed', 'error');
+                }
             }
+        }
+
+        function generateSimpleFallbackIlots(floorPlan, coverage) {
+            // Simple grid-based fallback placement
+            const bounds = floorPlan.bounds || { minX: 0, minY: 0, maxX: 20, maxY: 15 };
+            const ilots = [];
+            const ilotWidth = 3.0;
+            const ilotHeight = 2.0;
+            const spacing = 1.0;
+            
+            const maxIlots = Math.floor((bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY) * coverage / (ilotWidth * ilotHeight));
+            let count = 0;
+            
+            for (let x = bounds.minX + 1; x < bounds.maxX - ilotWidth && count < maxIlots; x += ilotWidth + spacing) {
+                for (let y = bounds.minY + 1; y < bounds.maxY - ilotHeight && count < maxIlots; y += ilotHeight + spacing) {
+                    ilots.push({
+                        id: `fallback_${count}`,
+                        x: x,
+                        y: y,
+                        width: ilotWidth,
+                        height: ilotHeight,
+                        type: 'workspace',
+                        capacity: 4,
+                        isValid: true,
+                        clearance: spacing / 2
+                    });
+                    count++;
+                }
+            }
+            
+            return ilots;
         }
 
         async function optimizeLayout() {
@@ -2295,41 +2339,166 @@
         }
 
         async function generateCorridors() {
-            if (!currentUrn) {
-                showNotification('Please upload a CAD file first', 'warning');
+            if (!currentFloorPlan) {
+                showNotification('Please upload a DXF file or CAD file first', 'warning');
                 return;
             }
 
-            const width = document.getElementById('corridorWidthSlider').value;
-            updateStatus('Generating Corridors', `Creating ${width}m wide circulation paths...`);
-            showNotification('Advanced corridor network generation...', 'info');
+            if (generatedIlots.length === 0) {
+                showNotification('Generate îlots first to connect with corridors', 'warning');
+                return;
+            }
+
+            const width = parseFloat(document.getElementById('corridorWidthSlider').value);
+            updateStatus('Generating Corridors', `Creating ${width}m wide circulation paths using A* pathfinding...`);
+            showNotification('Advanced corridor network generation with A* pathfinding...', 'info');
             setProgress(40);
 
             try {
-                const response = await fetch('/api/corridors', {
+                // Use our new corridor generation engine
+                const corridorData = {
+                    floorPlan: currentFloorPlan,
+                    ilots: generatedIlots,
+                    options: {
+                        corridorWidth: width,
+                        minClearance: 0.3,
+                        pathfindingResolution: 0.2,
+                        smoothingFactor: 0.8,
+                        connectAllEntrances: true,
+                        connectAllIlots: true
+                    }
+                };
+                
+                setProgress(60);
+                
+                // Call our advanced corridor generator API
+                const response = await fetch('/api/corridor-generation', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ urn: currentUrn })
+                    body: JSON.stringify(corridorData)
                 });
                 
-                if (response.ok) {
-                    const result = await response.json();
-                    corridorNetwork = result.corridors;
-                    setProgress(90);
+                if (!response.ok) {
+                    throw new Error(`Corridor generation failed: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    corridorNetwork = result.corridors.map(corridor => ({
+                        id: corridor.id,
+                        type: corridor.type,
+                        width: corridor.width,
+                        polygon: corridor.polygon,
+                        vertices: corridor.vertices,
+                        connections: corridor.connections,
+                        totalLength: corridor.totalLength,
+                        area: corridor.area
+                    }));
+                    
+                    setProgress(85);
                     
                     updateCorridorsList();
                     updateAnalysisStats();
                     
+                    // Refresh canvas render with corridors
+                    if (canvas && canvas.render) {
+                        canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
+                        canvas.fitToView();
+                    }
+                    
                     setProgress(100);
                     hideStatus();
-                    showNotification(`Generated ${corridorNetwork.length} optimized corridors`, 'success');
+                    
+                    const totalLength = corridorNetwork.reduce((sum, c) => sum + (c.totalLength || 0), 0);
+                    showNotification(`Generated ${corridorNetwork.length} optimized corridors (${totalLength.toFixed(1)}m total length)`, 'success');
+                    
+                    // Run validation after corridor generation
+                    setTimeout(() => {
+                        const validationResults = runComprehensiveValidation();
+                        console.log('🔍 Post-corridor validation:', validationResults);
+                    }, 1000);
+                    
+                    // Log corridor generation statistics
+                    console.log('Corridor Generation Statistics:', {
+                        totalCorridors: corridorNetwork.length,
+                        totalLength: totalLength,
+                        averageWidth: result.statistics?.averageWidth || width,
+                        pathfindingNodes: result.statistics?.pathfindingNodes || 0,
+                        pathfindingTime: result.statistics?.pathfindingTime || 0
+                    });
+                    
                 } else {
-                    throw new Error('Failed to generate corridors');
+                    throw new Error(result.error || 'Corridor generation failed');
                 }
+                
             } catch (error) {
                 hideStatus();
-                showNotification('Corridor generation failed: ' + error.message, 'error');
+                console.error('Advanced corridor generation failed:', error);
+                showNotification(`Advanced corridor generation failed: ${error.message}`, 'error');
+                
+                // Fallback to simple corridor generation
+                try {
+                    showNotification('Attempting fallback corridor generation...', 'info');
+                    corridorNetwork = generateSimpleFallbackCorridors(currentFloorPlan, generatedIlots, width);
+                    
+                    if (canvas && canvas.render) {
+                        canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
+                        canvas.fitToView();
+                    }
+                    
+                    updateCorridorsList();
+                    updateAnalysisStats();
+                    
+                    showNotification(`Fallback corridors: Generated ${corridorNetwork.length} basic corridors`, 'warning');
+                } catch (fallbackError) {
+                    showNotification('All corridor generation methods failed', 'error');
+                }
             }
+        }
+
+        function generateSimpleFallbackCorridors(floorPlan, ilots, width) {
+            // Simple corridor generation fallback
+            const corridors = [];
+            const bounds = floorPlan.bounds || { minX: 0, minY: 0, maxX: 20, maxY: 15 };
+            
+            // Create main horizontal corridor
+            const mainCorridor = {
+                id: 'main_horizontal',
+                type: 'main',
+                width: width,
+                polygon: [
+                    [bounds.minX, bounds.minY + (bounds.maxY - bounds.minY) / 2 - width/2],
+                    [bounds.maxX, bounds.minY + (bounds.maxY - bounds.minY) / 2 - width/2],
+                    [bounds.maxX, bounds.minY + (bounds.maxY - bounds.minY) / 2 + width/2],
+                    [bounds.minX, bounds.minY + (bounds.maxY - bounds.minY) / 2 + width/2]
+                ],
+                totalLength: bounds.maxX - bounds.minX,
+                area: (bounds.maxX - bounds.minX) * width
+            };
+            corridors.push(mainCorridor);
+            
+            // Create vertical connecting corridors for îlots
+            ilots.forEach((ilot, index) => {
+                if (index % 3 === 0) { // Connect every 3rd îlot
+                    const connector = {
+                        id: `connector_${index}`,
+                        type: 'secondary',
+                        width: width * 0.8,
+                        polygon: [
+                            [ilot.x + ilot.width/2 - width*0.4, bounds.minY + (bounds.maxY - bounds.minY) / 2 - width/2],
+                            [ilot.x + ilot.width/2 + width*0.4, bounds.minY + (bounds.maxY - bounds.minY) / 2 - width/2],
+                            [ilot.x + ilot.width/2 + width*0.4, ilot.y + ilot.height],
+                            [ilot.x + ilot.width/2 - width*0.4, ilot.y + ilot.height]
+                        ],
+                        totalLength: Math.abs(ilot.y - (bounds.minY + (bounds.maxY - bounds.minY) / 2)),
+                        area: Math.abs(ilot.y - (bounds.minY + (bounds.maxY - bounds.minY) / 2)) * width * 0.8
+                    };
+                    corridors.push(connector);
+                }
+            });
+            
+            return corridors;
         }
 
         async function optimizePaths() {
@@ -2428,6 +2597,348 @@
 
         async function exportTo3D() {
             showNotification('3D export is a premium feature', 'info');
+        }
+
+        // --- END-TO-END VALIDATION FUNCTIONS ---
+        
+        class ValidationEngine {
+            static validatePlacementSystem(floorPlan, ilots, corridors) {
+                const results = {
+                    isValid: true,
+                    errors: [],
+                    warnings: [],
+                    issues: [],
+                    score: 100
+                };
+                
+                console.log('🔍 Running comprehensive placement validation...');
+                
+                // Validate wall clearances
+                const wallValidation = this.validateWallClearances(floorPlan, ilots);
+                results.errors.push(...wallValidation.errors);
+                results.warnings.push(...wallValidation.warnings);
+                
+                // Validate zone overlaps
+                const zoneValidation = this.validateZoneOverlaps(floorPlan, ilots);
+                results.errors.push(...zoneValidation.errors);
+                results.warnings.push(...zoneValidation.warnings);
+                
+                // Validate corridor requirements
+                const corridorValidation = this.validateCorridorRequirements(corridors, floorPlan);
+                results.errors.push(...corridorValidation.errors);
+                results.warnings.push(...corridorValidation.warnings);
+                
+                // Validate connectivity
+                const connectivityValidation = this.validateConnectivity(ilots, corridors);
+                results.errors.push(...connectivityValidation.errors);
+                results.warnings.push(...connectivityValidation.warnings);
+                
+                // Calculate overall validation score
+                results.score = this.calculateValidationScore(results);
+                results.isValid = results.errors.length === 0;
+                
+                console.log(`✅ Validation completed: ${results.isValid ? 'PASSED' : 'FAILED'} (Score: ${results.score}%)`);
+                
+                return results;
+            }
+            
+            static validateWallClearances(floorPlan, ilots) {
+                const validation = { errors: [], warnings: [] };
+                const minWallDistance = 1.5; // meters
+                const warningDistance = 1.0; // meters
+                
+                if (!floorPlan.walls || !Array.isArray(ilots)) {
+                    return validation;
+                }
+                
+                ilots.forEach((ilot, index) => {
+                    let minDistanceFound = Infinity;
+                    
+                    floorPlan.walls.forEach(wall => {
+                        const distance = this.calculatePointToLineDistance(
+                            [ilot.x + ilot.width/2, ilot.y + ilot.height/2],
+                            wall.start,
+                            wall.end
+                        );
+                        
+                        minDistanceFound = Math.min(minDistanceFound, distance);
+                        
+                        if (distance < minWallDistance) {
+                            if (distance < warningDistance) {
+                                validation.errors.push(`Îlot ${index + 1}: Too close to wall (${distance.toFixed(2)}m < ${minWallDistance}m required)`);
+                            } else {
+                                validation.warnings.push(`Îlot ${index + 1}: Close to wall clearance limit (${distance.toFixed(2)}m)`);
+                            }
+                        }
+                    });
+                });
+                
+                return validation;
+            }
+            
+            static validateZoneOverlaps(floorPlan, ilots) {
+                const validation = { errors: [], warnings: [] };
+                
+                if (!Array.isArray(ilots)) return validation;
+                
+                // Check red zone (entrance) overlaps
+                if (floorPlan.redZones) {
+                    floorPlan.redZones.forEach((zone, zoneIndex) => {
+                        ilots.forEach((ilot, ilotIndex) => {
+                            if (this.checkPolygonOverlap(this.ilotToPolygon(ilot), zone.polygon)) {
+                                validation.errors.push(`Îlot ${ilotIndex + 1}: Overlaps with entrance zone ${zoneIndex + 1}`);
+                            }
+                        });
+                    });
+                }
+                
+                // Check blue zone (forbidden) overlaps
+                if (floorPlan.blueZones) {
+                    floorPlan.blueZones.forEach((zone, zoneIndex) => {
+                        ilots.forEach((ilot, ilotIndex) => {
+                            if (this.checkPolygonOverlap(this.ilotToPolygon(ilot), zone.polygon)) {
+                                validation.errors.push(`Îlot ${ilotIndex + 1}: Overlaps with forbidden zone ${zoneIndex + 1}`);
+                            }
+                        });
+                    });
+                }
+                
+                // Check îlot-to-îlot overlaps
+                for (let i = 0; i < ilots.length; i++) {
+                    for (let j = i + 1; j < ilots.length; j++) {
+                        if (this.checkIlotOverlap(ilots[i], ilots[j])) {
+                            validation.errors.push(`Îlot ${i + 1} overlaps with Îlot ${j + 1}`);
+                        }
+                    }
+                }
+                
+                return validation;
+            }
+            
+            static validateCorridorRequirements(corridors, floorPlan) {
+                const validation = { errors: [], warnings: [] };
+                const minCorridorWidth = 1.8; // meters
+                const recommendedWidth = 2.0; // meters
+                
+                if (!Array.isArray(corridors)) {
+                    validation.warnings.push('No corridors found - accessibility may be limited');
+                    return validation;
+                }
+                
+                corridors.forEach((corridor, index) => {
+                    // Validate corridor width
+                    const width = corridor.width || corridor.width_meters || 0;
+                    if (width < minCorridorWidth) {
+                        validation.errors.push(`Corridor ${index + 1}: Width too narrow (${width}m < ${minCorridorWidth}m required)`);
+                    } else if (width < recommendedWidth) {
+                        validation.warnings.push(`Corridor ${index + 1}: Width below recommended (${width}m < ${recommendedWidth}m recommended)`);
+                    }
+                    
+                    // Validate accessibility compliance
+                    if (corridor.accessibility === false) {
+                        validation.warnings.push(`Corridor ${index + 1}: Not marked as wheelchair accessible`);
+                    }
+                });
+                
+                // Check for main corridor presence
+                const hasMainCorridor = corridors.some(c => c.type === 'main');
+                if (!hasMainCorridor) {
+                    validation.warnings.push('No main corridor identified - consider adding primary circulation path');
+                }
+                
+                return validation;
+            }
+            
+            static validateConnectivity(ilots, corridors) {
+                const validation = { errors: [], warnings: [] };
+                
+                if (!Array.isArray(ilots) || ilots.length === 0) {
+                    return validation;
+                }
+                
+                if (!Array.isArray(corridors) || corridors.length === 0) {
+                    validation.warnings.push('No corridors defined - îlots may not be accessible');
+                    return validation;
+                }
+                
+                // Simple connectivity check - ensure îlots are near corridors
+                ilots.forEach((ilot, index) => {
+                    const hasNearbyAccess = corridors.some(corridor => {
+                        return this.calculateDistanceToPolygon(
+                            [ilot.x + ilot.width/2, ilot.y + ilot.height/2],
+                            corridor.polygon || []
+                        ) < 3.0; // Within 3 meters of a corridor
+                    });
+                    
+                    if (!hasNearbyAccess) {
+                        validation.warnings.push(`Îlot ${index + 1}: May not have adequate corridor access`);
+                    }
+                });
+                
+                return validation;
+            }
+            
+            static calculateValidationScore(results) {
+                let score = 100;
+                score -= results.errors.length * 15; // Major penalty for errors
+                score -= results.warnings.length * 5; // Minor penalty for warnings
+                return Math.max(0, Math.min(100, score));
+            }
+            
+            // Helper geometry functions
+            static calculatePointToLineDistance(point, lineStart, lineEnd) {
+                const A = point[0] - lineStart[0];
+                const B = point[1] - lineStart[1];
+                const C = lineEnd[0] - lineStart[0];
+                const D = lineEnd[1] - lineStart[1];
+                
+                const dot = A * C + B * D;
+                const lenSq = C * C + D * D;
+                let param = -1;
+                
+                if (lenSq !== 0) param = dot / lenSq;
+                
+                let xx, yy;
+                if (param < 0) {
+                    xx = lineStart[0];
+                    yy = lineStart[1];
+                } else if (param > 1) {
+                    xx = lineEnd[0];
+                    yy = lineEnd[1];
+                } else {
+                    xx = lineStart[0] + param * C;
+                    yy = lineStart[1] + param * D;
+                }
+                
+                const dx = point[0] - xx;
+                const dy = point[1] - yy;
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+            
+            static ilotToPolygon(ilot) {
+                return [
+                    [ilot.x, ilot.y],
+                    [ilot.x + ilot.width, ilot.y],
+                    [ilot.x + ilot.width, ilot.y + ilot.height],
+                    [ilot.x, ilot.y + ilot.height]
+                ];
+            }
+            
+            static checkIlotOverlap(ilot1, ilot2) {
+                return !(ilot1.x + ilot1.width <= ilot2.x || 
+                        ilot2.x + ilot2.width <= ilot1.x || 
+                        ilot1.y + ilot1.height <= ilot2.y || 
+                        ilot2.y + ilot2.height <= ilot1.y);
+            }
+            
+            static checkPolygonOverlap(poly1, poly2) {
+                // Simplified overlap check - you could implement a more sophisticated algorithm
+                if (!poly1 || !poly2 || poly1.length < 3 || poly2.length < 3) return false;
+                
+                // Check if any point of poly1 is inside poly2
+                return poly1.some(point => this.pointInPolygon(point, poly2));
+            }
+            
+            static pointInPolygon(point, polygon) {
+                const x = point[0], y = point[1];
+                let inside = false;
+                
+                for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                    const xi = polygon[i][0], yi = polygon[i][1];
+                    const xj = polygon[j][0], yj = polygon[j][1];
+                    
+                    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+                        inside = !inside;
+                    }
+                }
+                
+                return inside;
+            }
+            
+            static calculateDistanceToPolygon(point, polygon) {
+                if (!polygon || polygon.length === 0) return Infinity;
+                
+                let minDistance = Infinity;
+                for (let i = 0; i < polygon.length; i++) {
+                    const start = polygon[i];
+                    const end = polygon[(i + 1) % polygon.length];
+                    const distance = this.calculatePointToLineDistance(point, start, end);
+                    minDistance = Math.min(minDistance, distance);
+                }
+                
+                return minDistance;
+            }
+        }
+        
+        // Function to run validation and update UI
+        function runComprehensiveValidation() {
+            if (!currentFloorPlan || !generatedIlots) {
+                showNotification('Please generate îlots first to run validation', 'warning');
+                return;
+            }
+            
+            const results = ValidationEngine.validatePlacementSystem(
+                currentFloorPlan, 
+                generatedIlots, 
+                corridorNetwork || []
+            );
+            
+            // Update validation status in UI
+            updateValidationStatus(results);
+            
+            // Show summary notification
+            if (results.isValid) {
+                showNotification(`✅ Validation passed! Score: ${results.score}%`, 'success');
+            } else {
+                showNotification(`⚠️ Validation issues found! Score: ${results.score}%`, 'warning');
+            }
+            
+            return results;
+        }
+        
+        function updateValidationStatus(results) {
+            // Update status panel with validation results
+            const statusPanel = document.getElementById('validationStatus') || createValidationStatusPanel();
+            
+            statusPanel.innerHTML = `
+                <div class="validation-summary ${results.isValid ? 'valid' : 'invalid'}">
+                    <h4>Validation Results</h4>
+                    <div class="score">Score: ${results.score}%</div>
+                    <div class="status">${results.isValid ? '✅ PASSED' : '⚠️ ISSUES FOUND'}</div>
+                </div>
+                
+                ${results.errors.length > 0 ? `
+                    <div class="validation-errors">
+                        <h5>❌ Errors (${results.errors.length})</h5>
+                        <ul>
+                            ${results.errors.map(error => `<li>${error}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+                
+                ${results.warnings.length > 0 ? `
+                    <div class="validation-warnings">
+                        <h5>⚠️ Warnings (${results.warnings.length})</h5>
+                        <ul>
+                            ${results.warnings.map(warning => `<li>${warning}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
+            `;
+        }
+        
+        function createValidationStatusPanel() {
+            const panel = document.createElement('div');
+            panel.id = 'validationStatus';
+            panel.className = 'validation-status-panel';
+            
+            // Add to sidebar or create floating panel
+            const sidebar = document.querySelector('.sidebar-right .sidebar-content');
+            if (sidebar) {
+                sidebar.appendChild(panel);
+            }
+            
+            return panel;
         }
 
         // UI Update Functions
@@ -2563,60 +3074,162 @@
             }
         }
 
-        // View Management
-        function switchView(view) {
-            document.querySelectorAll('.header-btn').forEach(btn => btn.classList.remove('active'));
+        // DXF Processing Functions
+        async function importDxfFile() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.dxf';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                updateStatus('Importing DXF File', 'Processing DXF data...');
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    
+                    const response = await fetch('/api/dxf/import', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('DXF import failed');
+                    }
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        currentFloorPlan = result.floorPlan;
+                        hideStatus();
+                        updateFloorPlanDetails();
+                        updateElementsList();
+                        switchToCanvasView();
+                        showNotification(`DXF imported successfully! Found ${result.floorPlan.walls?.length || 0} walls, ${result.floorPlan.redZones?.length || 0} red zones, ${result.floorPlan.blueZones?.length || 0} blue zones.`, 'success');
+                    } else {
+                        throw new Error(result.error || 'Import failed');
+                    }
+                } catch (error) {
+                    hideStatus();
+                    showNotification(`DXF import failed: ${error.message}`, 'error');
+                }
+            };
+            input.click();
+        }
+
+        async function exportDxfFile() {
+            if (!currentFloorPlan) {
+                showNotification('No floor plan data to export. Please import a DXF file first.', 'warning');
+                return;
+            }
             
+            updateStatus('Exporting DXF File', 'Generating DXF data...');
+            
+            try {
+                const exportData = {
+                    floorPlan: {
+                        ...currentFloorPlan,
+                        ilots: generatedIlots.map(ilot => ({
+                            id: ilot.id,
+                            geometry: {
+                                polygon: [
+                                    [ilot.x, ilot.y],
+                                    [ilot.x + ilot.width, ilot.y],
+                                    [ilot.x + ilot.width, ilot.y + ilot.height],
+                                    [ilot.x, ilot.y + ilot.height]
+                                ]
+                            },
+                            type: ilot.type,
+                            properties: { capacity: ilot.capacity }
+                        })),
+                        corridors: corridorNetwork.map(corridor => ({
+                            id: corridor.id,
+                            polygon: corridor.polygon || corridor.vertices || []
+                        }))
+                    },
+                    options: {
+                        filename: `floorplan_${new Date().toISOString().split('T')[0]}.dxf`
+                    }
+                };
+                
+                const response = await fetch('/api/dxf/export', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(exportData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('DXF export failed');
+                }
+                
+                // Download the file
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = exportData.options.filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                hideStatus();
+                showNotification('DXF file exported successfully!', 'success');
+                
+            } catch (error) {
+                hideStatus();
+                showNotification(`DXF export failed: ${error.message}`, 'error');
+            }
+        }
+
+        // View Management
+        function switchToAutodeskView() {
+            document.querySelectorAll('.header-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('autodeskViewBtn').classList.add('active');
+            
+            document.getElementById('floorPlanCanvas').style.display = 'none';
+            document.getElementById('forgeViewer').style.display = 'block';
+            
+            if (viewer) {
+                viewer.resize();
+                setTimeout(() => {
+                    viewer.fitToView();
+                    if (generatedIlots.length > 0) {
+                        visualizeIlotsOn3D();
+                    }
+                }, 200);
+            }
+            showNotification('Switched to Autodesk SDK View', 'info', 2000);
+        }
+
+        function switchToCanvasView() {
+            document.querySelectorAll('.header-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('canvasViewBtn').classList.add('active');
+            
+            document.getElementById('floorPlanCanvas').style.display = 'block';
+            document.getElementById('forgeViewer').style.display = 'none';
+            
+            if (canvas && canvas.render) {
+                canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
+                if (currentFloorPlan) canvas.fitToView();
+            }
+            showNotification('Switched to Manual Canvas View', 'info', 2000);
+        }
+
+        // Legacy view function for compatibility
+        function switchView(view) {
             switch (view) {
                 case 'render':
-                    document.getElementById('renderViewBtn').classList.add('active');
-                    document.getElementById('floorPlanCanvas').style.display = 'block';
-                    document.getElementById('forgeViewer').style.display = 'none';
-                    
-                    if (canvas && canvas.render) {
-                        canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
-                        if (currentFloorPlan) canvas.fitToView();
-                    }
+                case 'canvas':
+                    switchToCanvasView();
                     break;
-                    
                 case 'analysis':
-                    // Analysis View - Shows detailed analysis data with API calls
-                    document.getElementById('analysisViewBtn').classList.add('active');
-                    document.getElementById('floorPlanCanvas').style.display = 'none';
-                    document.getElementById('forgeViewer').style.display = 'block';
-                    
-                    // Load analysis data from API
-                    loadAnalysisView();
-                    showNotification('Analysis View - Detailed metrics and insights', 'info', 2000);
-                    break;
-                    
                 case '3d':
-                    document.getElementById('walkthrough3dBtn').classList.add('active');
-                    document.getElementById('floorPlanCanvas').style.display = 'none';
-                    document.getElementById('forgeViewer').style.display = 'block';
-                    
-                    if (viewer) {
-                        viewer.resize();
-                        setTimeout(() => {
-                            viewer.fitToView();
-                            // Refresh îlot overlays
-                            if (generatedIlots.length > 0) {
-                                visualizeIlotsOn3D();
-                            }
-                        }, 200);
-                    }
-                    showNotification('3D View - Interactive CAD model with live îlots', 'info', 2000);
+                    switchToAutodeskView();
                     break;
-                    
-                case 'export':
-                    // Export View - Shows export options and preview
-                    document.getElementById('exportViewBtn').classList.add('active');
-                    document.getElementById('floorPlanCanvas').style.display = 'none';
-                    document.getElementById('forgeViewer').style.display = 'block';
-                    
-                    // Show export preview
-                    showExportPreview();
-                    showNotification('Export View - Generate reports and files', 'info', 2000);
+                default:
+                    switchToAutodeskView();
                     break;
             }
         }
