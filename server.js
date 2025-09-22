@@ -17,11 +17,11 @@ const APS_CLIENT_ID = process.env.APS_CLIENT_ID;
 const APS_CLIENT_SECRET = process.env.APS_CLIENT_SECRET;
 
 if (!APS_CLIENT_ID || !APS_CLIENT_SECRET) {
-    console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-    console.error('!!! CRITICAL ERROR: Missing APS_CLIENT_ID or APS_CLIENT_SECRET in .env file.');
-    console.error('!!! Please add your Autodesk Platform Services credentials to the .env file.');
-    console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-    process.exit(1);
+    console.warn('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+    console.warn('!!! WARNING: Missing APS_CLIENT_ID or APS_CLIENT_SECRET environment variables.');
+    console.warn('!!! CAD file processing features will be disabled until credentials are provided.');
+    console.warn('!!! Please add your Autodesk Platform Services credentials using the secrets manager.');
+    console.warn('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
 }
 
 const upload = multer({ dest: 'uploads/' });
@@ -397,9 +397,11 @@ io.on('connection', (socket) => {
 });
 
 // --- SERVER STARTUP ---
-const PORT = process.env.PORT || 3002;
-server.listen(PORT, () => {
-    console.log(`\nFloorPlan Pro Backend running on http://localhost:${PORT}`);
+const PORT = process.env.PORT || 5000;
+const HOST = '0.0.0.0';
+
+server.listen(PORT, HOST, () => {
+    console.log(`\nFloorPlan Pro Backend running on http://${HOST}:${PORT}`);
     console.log(`🔗 WebSocket server ready for real-time collaboration`);
     if (!fs.existsSync('uploads')) {
         fs.mkdirSync('uploads');
