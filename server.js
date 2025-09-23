@@ -23,11 +23,17 @@ const CorridorGenerator = require('./src/corridor-generator');
 const APS_CLIENT_ID = process.env.APS_CLIENT_ID;
 const APS_CLIENT_SECRET = process.env.APS_CLIENT_SECRET;
 
+console.log('🔧 Environment Check:');
+console.log('   NODE_ENV:', process.env.NODE_ENV || 'not set');
+console.log('   APS_CLIENT_ID:', APS_CLIENT_ID ? `${APS_CLIENT_ID.substring(0, 8)}...` : 'NOT SET');
+console.log('   APS_CLIENT_SECRET:', APS_CLIENT_SECRET ? `${APS_CLIENT_SECRET.substring(0, 8)}...` : 'NOT SET');
+
 if (!APS_CLIENT_ID || !APS_CLIENT_SECRET) {
     console.warn('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
     console.warn('!!! WARNING: Missing APS_CLIENT_ID or APS_CLIENT_SECRET environment variables.');
     console.warn('!!! CAD file processing features will be disabled until credentials are provided.');
     console.warn('!!! Please add your Autodesk Platform Services credentials using the secrets manager.');
+    console.warn('!!! Make sure your APS app has access to: Data Management API, Model Derivative API');
     console.warn('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
 }
 
@@ -41,6 +47,44 @@ app.get('/', (req, res) => {
 });
 
 // --- API ENDPOINTS ---
+
+// Test APS credentials
+app.get('/api/auth/test', async (req, res) => {
+    if (!APS_CLIENT_ID || !APS_CLIENT_SECRET) {
+        return res.status(400).json({
+            success: false,
+            error: 'APS credentials not configured',
+            message: 'Please add APS_CLIENT_ID and APS_CLIENT_SECRET to your Replit Secrets'
+        });
+    }
+
+    try {
+        const authResponse = await axios.post('https://developer.api.autodesk.com/authentication/v2/token', 
+            `client_id=${APS_CLIENT_ID}&client_secret=${APS_CLIENT_SECRET}&grant_type=client_credentials&scope=data:read`,
+            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+        
+        res.json({
+            success: true,
+            message: 'APS credentials are valid',
+            scopes: authResponse.data.scope,
+            expires_in: authResponse.data.expires_in
+        });
+    } catch (error) {
+        console.error('❌ APS Credential Test Failed:', error.response?.data || error.message);
+        res.status(400).json({
+            success: false,
+            error: 'Invalid APS credentials',
+            details: error.response?.data || error.message,
+            suggestions: [
+                'Verify your Client ID and Secret in Replit Secrets',
+                'Ensure your APS app has Data Management API enabled',
+                'Check if your app is activated in the APS console'
+            ]
+        });
+    }
+});
+
 app.get('/api/auth/token', async (req, res) => {
     try {
         const authResponse = await axios.post('https://developer.api.autodesk.com/authentication/v2/token', 
