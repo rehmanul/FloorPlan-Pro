@@ -20,8 +20,8 @@ const IlotPlacementEngine = require('./src/ilot-placement-engine');
 const CorridorGenerator = require('./src/corridor-generator');
 
 // --- CONFIGURATION & VALIDATION ---
-const APS_CLIENT_ID = process.env.APS_CLIENT_ID;
-const APS_CLIENT_SECRET = process.env.APS_CLIENT_SECRET;
+const APS_CLIENT_ID = process.env.APS_CLIENT_ID || process.env.FORGE_CLIENT_ID;
+const APS_CLIENT_SECRET = process.env.APS_CLIENT_SECRET || process.env.FORGE_CLIENT_SECRET;
 
 console.log('🔧 Environment Check:');
 console.log('   NODE_ENV:', process.env.NODE_ENV || 'not set');
