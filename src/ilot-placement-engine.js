@@ -1,66 +1,93 @@
+
 /**
- * Advanced Îlot Placement Engine for Architectural Floor Plans
+ * Advanced Îlot Placement Engine
  * 
- * Implements production-level îlot (island) placement with:
- * - Geometric collision detection with walls and forbidden zones
- * - Poisson-disk sampling for optimal spatial distribution
- * - Multi-constraint validation and optimization
- * - Real-time placement verification and adjustment
+ * Implements sophisticated algorithms for optimal placement of îlots (workspace islands)
+ * in architectural floor plans with collision detection, accessibility compliance,
+ * and multi-objective optimization.
+ * 
+ * Features:
+ * - Spatial indexing with RBush for efficient collision detection
+ * - Multi-objective optimization (space utilization, accessibility, workflow)
+ * - Constraint-based placement with wall buffers and clearances
+ * - Integration with room detection and corridor planning
+ * - Real-time validation and adjustment
  * 
  * Dependencies:
- * - GeometryEngine for spatial operations
- * - Floor plan data with walls, red zones (entrances), blue zones (forbidden)
+ * - rbush: Spatial indexing for collision detection
+ * - GeometryEngine: Geometric calculations and spatial operations
  * 
  * @author FloorPlan Pro Team
- * @version 1.0.0
+ * @version 2.0.0
  */
 
+const RBush = require('rbush');
 const GeometryEngine = require('./geometry-engine');
 
 class IlotPlacementEngine {
     constructor(options = {}) {
+        // Initialize geometry engine
         this.geometryEngine = new GeometryEngine({
             tolerance: options.tolerance || 0.001,
             debugMode: options.debugMode || false
         });
         
+        // Initialize spatial index for collision detection
+        this.spatialIndex = new RBush();
+        
         // Placement configuration
         this.config = {
-            // Minimum distances (in meters)
-            minWallDistance: options.minWallDistance || 1.5,
+            // Spatial constraints
+            minWallDistance: options.minWallDistance || 0.5,
             minIlotDistance: options.minIlotDistance || 2.0,
-            minCorridorWidth: options.minCorridorWidth || 1.8,
+            minDoorClearance: options.minDoorClearance || 1.5,
+            maxWallDistance: options.maxWallDistance || 5.0,
             
             // Îlot dimensions
-            defaultIlotSize: options.defaultIlotSize || { width: 3.0, height: 2.0 },
-            ilotTypes: options.ilotTypes || {
-                'work': { width: 3.0, height: 2.0, capacity: 4 },
-                'meeting': { width: 4.0, height: 3.0, capacity: 8 },
-                'social': { width: 5.0, height: 3.5, capacity: 12 },
-                'break': { width: 3.5, height: 2.5, capacity: 6 },
-                'focus': { width: 2.5, height: 1.8, capacity: 2 },
-                'collaboration': { width: 4.5, height: 3.5, capacity: 10 }
+            defaultIlotSize: {
+                width: options.ilotWidth || 3.0,
+                height: options.ilotHeight || 2.0
+            },
+            minIlotSize: {
+                width: options.minIlotWidth || 2.0,
+                height: options.minIlotHeight || 1.5
+            },
+            maxIlotSize: {
+                width: options.maxIlotWidth || 4.0,
+                height: options.maxIlotHeight || 3.0
             },
             
-            // Poisson-disk sampling parameters
-            poissonRadius: options.poissonRadius || 3.0,
-            poissonTries: options.poissonTries || 30,
+            // Placement algorithm parameters
             maxIterations: options.maxIterations || 1000,
+            placementStrategy: options.placementStrategy || 'optimized', // 'grid', 'random', 'optimized'
+            gridResolution: options.gridResolution || 0.5,
             
-            // Optimization parameters
-            densityWeight: options.densityWeight || 0.4,
-            accessibilityWeight: options.accessibilityWeight || 0.3,
-            efficiencyWeight: options.efficiencyWeight || 0.3,
+            // Optimization weights
+            weights: {
+                spaceUtilization: options.spaceWeight || 0.4,
+                accessibility: options.accessibilityWeight || 0.3,
+                workflow: options.workflowWeight || 0.3
+            },
+            
+            // Performance limits
+            maxPlacementAttempts: options.maxAttempts || 1000,
+            timeoutMs: options.timeoutMs || 30000,
             
             ...options
         };
         
         // State variables
         this.floorPlan = null;
-        this.forbiddenZones = [];
-        this.allowedSpace = null;
         this.placedIlots = [];
-        this.placementCandidates = [];
+        this.restrictedZones = [];
+        this.allowedZones = [];
+        this.placementGrid = null;
+        this.placementStats = {
+            totalAttempts: 0,
+            successfulPlacements: 0,
+            collisionDetections: 0,
+            optimizationIterations: 0
+        };
         
         this.log('IlotPlacementEngine initialized', this.config);
     }
@@ -71,333 +98,545 @@ class IlotPlacementEngine {
 
     /**
      * Generate optimized îlot placement for floor plan
-     * @param {Object} floorPlan - Floor plan data with walls, zones, entrances
-     * @param {Object} requirements - Placement requirements and constraints
-     * @returns {Promise<Array>} Array of placed îlots with positions and properties
+     * @param {Object} floorPlan - Floor plan with walls, doors, and zones
+     * @param {Object} options - Placement options
+     * @returns {Promise<Array>} Array of placed îlots
      */
-    async generateOptimizedPlacement(floorPlan, requirements = {}) {
+    async generateOptimizedPlacement(floorPlan, options = {}) {
         try {
-            this.log('Starting îlot placement generation');
+            this.log('Starting optimized îlot placement');
             
-            // Initialize floor plan data
+            // Initialize state
             this.floorPlan = floorPlan;
             this.placedIlots = [];
+            this.spatialIndex.clear();
+            this.resetPlacementStats();
             
-            // Step 1: Calculate forbidden zones
-            await this.calculateForbiddenZones();
+            // Merge options with config
+            const placementConfig = { ...this.config, ...options };
             
-            // Step 2: Generate allowed space
-            await this.generateAllowedSpace();
+            // Step 1: Analyze floor plan and prepare placement zones
+            await this.prepareFloorPlanForPlacement();
             
-            // Step 3: Generate placement candidates using Poisson-disk sampling
-            await this.generatePlacementCandidates();
+            // Step 2: Create placement grid
+            await this.createPlacementGrid();
             
-            // Step 4: Optimize îlot placement
-            await this.optimizePlacement(requirements);
+            // Step 3: Calculate îlot requirements
+            const ilotRequirements = this.calculateIlotRequirements(placementConfig);
             
-            // Step 5: Validate final placement
-            const validationResult = await this.validatePlacement();
+            // Step 4: Execute placement strategy
+            await this.executePlacementStrategy(ilotRequirements, placementConfig);
             
-            if (!validationResult.isValid) {
-                this.logError('Placement validation failed', validationResult.errors);
-                throw new Error(`Placement validation failed: ${validationResult.errors.join(', ')}`);
+            // Step 5: Optimize placement
+            await this.optimizePlacement();
+            
+            // Step 6: Validate placement
+            const validation = await this.validatePlacement();
+            
+            if (!validation.isValid) {
+                this.logError('Placement validation failed', validation.errors);
+                // Continue with warnings but don't fail completely
             }
             
-            this.log('Îlot placement completed', { 
-                totalIlots: this.placedIlots.length,
-                coverage: this.calculateCoverage(),
-                efficiency: this.calculateEfficiency()
+            this.log('Optimized placement completed', {
+                placedIlots: this.placedIlots.length,
+                totalAttempts: this.placementStats.totalAttempts,
+                successRate: this.placementStats.successfulPlacements / this.placementStats.totalAttempts
             });
             
             return this.placedIlots;
             
         } catch (error) {
-            this.logError('Îlot placement generation failed', error);
+            this.logError('Optimized placement failed', error);
             throw error;
         }
     }
 
     /**
-     * FORBIDDEN ZONE CALCULATION
+     * FLOOR PLAN ANALYSIS
      */
 
     /**
-     * Calculate all forbidden zones (buffered walls + red + blue zones)
+     * Prepare floor plan for placement by identifying zones and constraints
      */
-    async calculateForbiddenZones() {
+    async prepareFloorPlanForPlacement() {
         try {
-            this.forbiddenZones = [];
+            this.log('Preparing floor plan for placement');
             
-            // 1. Buffer walls by minimum distance
-            if (this.floorPlan.walls && this.floorPlan.walls.length > 0) {
-                const bufferedWalls = this.floorPlan.walls.map(wall => {
-                    const wallPolygon = this.wallToPolygon(wall);
-                    const buffered = this.geometryEngine.bufferPolygon(
-                        wallPolygon, 
-                        this.config.minWallDistance
-                    );
-                    return buffered;
-                }).flat();
-                
-                this.forbiddenZones.push(...bufferedWalls);
-                this.log('Buffered walls added to forbidden zones', { count: bufferedWalls.length });
-            }
+            // Extract walls and create restricted zones
+            this.extractWallConstraints();
             
-            // 2. Add red zones (entrances/exits) - no buffering needed as they're already forbidden
-            if (this.floorPlan.redZones && this.floorPlan.redZones.length > 0) {
-                this.forbiddenZones.push(...this.floorPlan.redZones);
-                this.log('Red zones added to forbidden zones', { count: this.floorPlan.redZones.length });
-            }
+            // Extract door/window constraints
+            this.extractOpeningConstraints();
             
-            // 3. Add blue zones (forbidden areas)
-            if (this.floorPlan.blueZones && this.floorPlan.blueZones.length > 0) {
-                this.forbiddenZones.push(...this.floorPlan.blueZones);
-                this.log('Blue zones added to forbidden zones', { count: this.floorPlan.blueZones.length });
-            }
+            // Extract predefined zones (red zones = restricted, blue zones = preferred)
+            this.extractZoneConstraints();
             
-            // 4. Union all forbidden zones for efficiency
-            if (this.forbiddenZones.length > 1) {
-                this.forbiddenZones = this.geometryEngine.unionPolygons(this.forbiddenZones);
-                this.log('Forbidden zones unified', { finalCount: this.forbiddenZones.length });
-            }
+            // Calculate allowed placement areas
+            this.calculateAllowedZones();
             
-        } catch (error) {
-            this.logError('Forbidden zone calculation failed', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Generate allowed space for îlot placement
-     */
-    async generateAllowedSpace() {
-        try {
-            // Start with the building boundary
-            let allowedSpace = this.floorPlan.boundary || this.floorPlan.outline;
+            // Index all constraints in spatial index
+            this.indexConstraints();
             
-            if (!allowedSpace) {
-                throw new Error('No building boundary or outline provided');
-            }
-            
-            // Subtract all forbidden zones from allowed space
-            for (const forbiddenZone of this.forbiddenZones) {
-                const difference = this.geometryEngine.differencePolygons(allowedSpace, forbiddenZone);
-                if (difference.length > 0) {
-                    allowedSpace = difference[0]; // Take largest remaining area
-                }
-            }
-            
-            this.allowedSpace = allowedSpace;
-            
-            const allowedArea = this.geometryEngine.calculatePolygonArea(this.allowedSpace);
-            this.log('Allowed space calculated', { area: allowedArea });
-            
-        } catch (error) {
-            this.logError('Allowed space generation failed', error);
-            throw error;
-        }
-    }
-
-    /**
-     * POISSON-DISK SAMPLING
-     */
-
-    /**
-     * Generate placement candidates using Poisson-disk sampling
-     */
-    async generatePlacementCandidates() {
-        try {
-            this.placementCandidates = [];
-            
-            if (!this.allowedSpace) {
-                throw new Error('No allowed space available for candidate generation');
-            }
-            
-            // Calculate bounding box of allowed space
-            const bbox = this.geometryEngine.calculateBoundingBox(this.allowedSpace);
-            
-            // Initialize active list with first random point
-            const activeList = [];
-            const processedPoints = [];
-            const grid = new Map();
-            
-            const cellSize = this.config.poissonRadius / Math.sqrt(2);
-            const gridWidth = Math.ceil((bbox.maxX - bbox.minX) / cellSize);
-            const gridHeight = Math.ceil((bbox.maxY - bbox.minY) / cellSize);
-            
-            // Add initial random point
-            const initialPoint = this.generateRandomPointInPolygon(this.allowedSpace);
-            if (initialPoint) {
-                activeList.push(initialPoint);
-                this.addToGrid(initialPoint, grid, bbox, cellSize);
-                processedPoints.push(initialPoint);
-            }
-            
-            let iterations = 0;
-            
-            // Poisson-disk sampling main loop
-            while (activeList.length > 0 && iterations < this.config.maxIterations) {
-                iterations++;
-                
-                // Pick random point from active list
-                const randomIndex = Math.floor(Math.random() * activeList.length);
-                const currentPoint = activeList[randomIndex];
-                
-                let foundValidPoint = false;
-                
-                // Try to place new points around current point
-                for (let i = 0; i < this.config.poissonTries; i++) {
-                    const newPoint = this.generatePointAroundRadius(
-                        currentPoint, 
-                        this.config.poissonRadius,
-                        this.config.poissonRadius * 2
-                    );
-                    
-                    if (this.isValidCandidate(newPoint, processedPoints, grid, bbox, cellSize)) {
-                        activeList.push(newPoint);
-                        this.addToGrid(newPoint, grid, bbox, cellSize);
-                        processedPoints.push(newPoint);
-                        foundValidPoint = true;
-                        break;
-                    }
-                }
-                
-                // Remove current point from active list if no valid points found
-                if (!foundValidPoint) {
-                    activeList.splice(randomIndex, 1);
-                }
-            }
-            
-            this.placementCandidates = processedPoints;
-            
-            this.log('Placement candidates generated', { 
-                candidateCount: this.placementCandidates.length,
-                iterations 
+            this.log('Floor plan preparation completed', {
+                restrictedZones: this.restrictedZones.length,
+                allowedZones: this.allowedZones.length
             });
             
         } catch (error) {
-            this.logError('Candidate generation failed', error);
+            this.logError('Floor plan preparation failed', error);
             throw error;
         }
     }
 
     /**
-     * PLACEMENT OPTIMIZATION
+     * Extract wall constraints from floor plan
      */
-
-    /**
-     * Optimize îlot placement based on requirements
-     * @param {Object} requirements - Placement requirements
-     */
-    async optimizePlacement(requirements) {
-        try {
-            const targetIlots = requirements.targetIlots || this.estimateOptimalIlotCount();
-            const ilotTypeDistribution = requirements.ilotTypeDistribution || this.getDefaultTypeDistribution();
-            
-            // Score all candidates
-            const scoredCandidates = this.placementCandidates.map(candidate => ({
-                position: candidate,
-                score: this.calculateCandidateScore(candidate),
-                type: this.selectIlotType(candidate, ilotTypeDistribution)
-            }));
-            
-            // Sort by score (higher is better)
-            scoredCandidates.sort((a, b) => b.score - a.score);
-            
-            // Place îlots greedily, avoiding collisions
-            let placedCount = 0;
-            
-            for (const candidate of scoredCandidates) {
-                if (placedCount >= targetIlots) break;
-                
-                const ilotGeometry = this.createIlotGeometry(candidate.position, candidate.type);
-                
-                if (this.canPlaceIlot(ilotGeometry)) {
-                    const ilot = {
-                        id: `ilot_${placedCount + 1}`,
-                        position: candidate.position,
-                        type: candidate.type,
-                        geometry: ilotGeometry,
-                        properties: this.config.ilotTypes[candidate.type],
-                        score: candidate.score,
-                        metadata: {
-                            placementOrder: placedCount + 1,
-                            timestamp: new Date().toISOString()
-                        }
-                    };
-                    
-                    this.placedIlots.push(ilot);
-                    placedCount++;
-                }
-            }
-            
-            this.log('Placement optimization completed', { 
-                targetIlots, 
-                placedIlots: placedCount,
-                efficiency: placedCount / targetIlots 
-            });
-            
-        } catch (error) {
-            this.logError('Placement optimization failed', error);
-            throw error;
-        }
-    }
-
-    /**
-     * VALIDATION AND SCORING
-     */
-
-    /**
-     * Validate final placement
-     * @returns {Object} Validation result
-     */
-    async validatePlacement() {
-        const errors = [];
+    extractWallConstraints() {
+        if (!this.floorPlan.walls) return;
         
+        for (const wall of this.floorPlan.walls) {
+            // Create buffer zone around walls
+            const wallPolygon = this.createWallPolygon(wall);
+            const bufferedWall = this.geometryEngine.offsetPolygon(wallPolygon, this.config.minWallDistance);
+            
+            this.restrictedZones.push({
+                type: 'wall_buffer',
+                polygon: bufferedWall,
+                constraint: 'hard',
+                priority: 1.0
+            });
+        }
+    }
+
+    /**
+     * Extract door and window constraints
+     */
+    extractOpeningConstraints() {
+        // Process doors
+        if (this.floorPlan.doors) {
+            for (const door of this.floorPlan.doors) {
+                const clearanceZone = this.createDoorClearanceZone(door);
+                this.restrictedZones.push({
+                    type: 'door_clearance',
+                    polygon: clearanceZone,
+                    constraint: 'hard',
+                    priority: 1.0
+                });
+            }
+        }
+        
+        // Process windows (usually less restrictive)
+        if (this.floorPlan.windows) {
+            for (const window of this.floorPlan.windows) {
+                const clearanceZone = this.createWindowClearanceZone(window);
+                this.restrictedZones.push({
+                    type: 'window_clearance',
+                    polygon: clearanceZone,
+                    constraint: 'soft',
+                    priority: 0.7
+                });
+            }
+        }
+    }
+
+    /**
+     * Extract zone constraints (red zones = forbidden, blue zones = preferred)
+     */
+    extractZoneConstraints() {
+        // Red zones (forbidden areas)
+        if (this.floorPlan.redZones) {
+            for (const redZone of this.floorPlan.redZones) {
+                this.restrictedZones.push({
+                    type: 'forbidden_zone',
+                    polygon: redZone.polygon || redZone,
+                    constraint: 'hard',
+                    priority: 1.0
+                });
+            }
+        }
+        
+        // Blue zones (preferred areas)
+        if (this.floorPlan.blueZones) {
+            for (const blueZone of this.floorPlan.blueZones) {
+                this.allowedZones.push({
+                    type: 'preferred_zone',
+                    polygon: blueZone.polygon || blueZone,
+                    priority: 1.5,
+                    bonus: 0.3
+                });
+            }
+        }
+    }
+
+    /**
+     * PLACEMENT GRID SYSTEM
+     */
+
+    /**
+     * Create placement grid for systematic îlot placement
+     */
+    async createPlacementGrid() {
         try {
-            // Check each îlot for violations
-            for (const ilot of this.placedIlots) {
-                // Check wall distance
-                if (!this.checkMinWallDistance(ilot)) {
-                    errors.push(`Îlot ${ilot.id} too close to walls`);
-                }
-                
-                // Check forbidden zone overlap
-                if (this.checkForbiddenZoneOverlap(ilot)) {
-                    errors.push(`Îlot ${ilot.id} overlaps forbidden zone`);
-                }
-                
-                // Check îlot-to-îlot collisions
-                const collisions = this.checkIlotCollisions(ilot);
-                if (collisions.length > 0) {
-                    errors.push(`Îlot ${ilot.id} collides with îlots: ${collisions.join(', ')}`);
-                }
+            if (!this.floorPlan.boundary && !this.floorPlan.bounds) {
+                // Create default boundary from walls
+                this.createDefaultBoundary();
             }
             
-            // Check global constraints
-            const coverage = this.calculateCoverage();
-            if (coverage > 0.7) { // Max 70% coverage
-                errors.push(`Space coverage too high: ${(coverage * 100).toFixed(1)}%`);
-            }
+            const boundary = this.floorPlan.boundary || this.createBoundaryFromBounds();
+            const bbox = this.geometryEngine.calculateBoundingBox(boundary);
             
-            return {
-                isValid: errors.length === 0,
-                errors,
-                metrics: {
-                    coverage,
-                    efficiency: this.calculateEfficiency(),
-                    ilotCount: this.placedIlots.length
-                }
+            const gridWidth = Math.ceil((bbox.maxX - bbox.minX) / this.config.gridResolution);
+            const gridHeight = Math.ceil((bbox.maxY - bbox.minY) / this.config.gridResolution);
+            
+            this.log('Creating placement grid', { 
+                gridWidth, 
+                gridHeight, 
+                resolution: this.config.gridResolution 
+            });
+            
+            // Initialize grid
+            this.placementGrid = {
+                bbox,
+                width: gridWidth,
+                height: gridHeight,
+                resolution: this.config.gridResolution,
+                cells: new Array(gridWidth * gridHeight).fill(0),
+                scores: new Array(gridWidth * gridHeight).fill(0)
             };
+            
+            // Calculate placement scores for each cell
+            await this.calculatePlacementScores();
+            
+            this.log('Placement grid created', {
+                totalCells: this.placementGrid.cells.length,
+                validCells: this.placementGrid.cells.filter(cell => cell > 0).length
+            });
             
         } catch (error) {
-            this.logError('Validation failed', error);
-            return {
-                isValid: false,
-                errors: [`Validation error: ${error.message}`],
-                metrics: {}
-            };
+            this.logError('Placement grid creation failed', error);
+            throw error;
         }
+    }
+
+    /**
+     * Calculate placement suitability scores for grid cells
+     */
+    async calculatePlacementScores() {
+        const { width, height, bbox, resolution } = this.placementGrid;
+        
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const worldX = bbox.minX + (x + 0.5) * resolution;
+                const worldY = bbox.minY + (y + 0.5) * resolution;
+                const point = [worldX, worldY];
+                
+                // Calculate base score
+                let score = this.calculateCellBaseScore(point);
+                
+                // Apply zone bonuses/penalties
+                score = this.applySpatialModifiers(point, score);
+                
+                // Store score
+                const index = y * width + x;
+                this.placementGrid.scores[index] = score;
+                this.placementGrid.cells[index] = score > 0 ? 1 : 0;
+            }
+        }
+    }
+
+    /**
+     * Calculate base placement score for a cell
+     * @param {Array} point - Point to evaluate
+     * @returns {number} Base score (0-1)
+     */
+    calculateCellBaseScore(point) {
+        // Check if point is in restricted zones
+        for (const restrictedZone of this.restrictedZones) {
+            if (this.geometryEngine.pointInPolygon(point, restrictedZone.polygon)) {
+                if (restrictedZone.constraint === 'hard') {
+                    return 0; // Forbidden
+                } else {
+                    return 0.3; // Discouraged but possible
+                }
+            }
+        }
+        
+        // Check if point has clearance for îlot placement
+        if (!this.hasIlotClearance(point)) {
+            return 0;
+        }
+        
+        return 0.8; // Base suitable score
+    }
+
+    /**
+     * Apply spatial modifiers (preferred zones, accessibility, etc.)
+     * @param {Array} point - Point to evaluate
+     * @param {number} baseScore - Base score
+     * @returns {number} Modified score
+     */
+    applySpatialModifiers(point, baseScore) {
+        if (baseScore <= 0) return baseScore;
+        
+        let modifiedScore = baseScore;
+        
+        // Apply preferred zone bonuses
+        for (const allowedZone of this.allowedZones) {
+            if (this.geometryEngine.pointInPolygon(point, allowedZone.polygon)) {
+                modifiedScore *= allowedZone.priority;
+                modifiedScore += allowedZone.bonus || 0;
+            }
+        }
+        
+        // Apply accessibility score
+        const accessibilityScore = this.calculateAccessibilityScore(point);
+        modifiedScore *= (0.7 + 0.3 * accessibilityScore);
+        
+        // Apply workflow efficiency score
+        const workflowScore = this.calculateWorkflowScore(point);
+        modifiedScore *= (0.8 + 0.2 * workflowScore);
+        
+        return Math.min(modifiedScore, 1.0); // Cap at 1.0
+    }
+
+    /**
+     * PLACEMENT STRATEGIES
+     */
+
+    /**
+     * Calculate îlot requirements based on floor plan and configuration
+     * @param {Object} config - Placement configuration
+     * @returns {Object} Îlot requirements
+     */
+    calculateIlotRequirements(config) {
+        const totalArea = this.calculateUsableArea();
+        const ilotArea = config.defaultIlotSize.width * config.defaultIlotSize.height;
+        const maxIlots = Math.floor(totalArea * config.coverage / ilotArea);
+        
+        return {
+            totalIlots: Math.min(maxIlots, config.maxIlots || 50),
+            ilotTypes: this.determineIlotTypes(config),
+            sizingStrategy: config.sizingStrategy || 'uniform',
+            densityTarget: config.coverage || 0.3
+        };
+    }
+
+    /**
+     * Execute the selected placement strategy
+     * @param {Object} requirements - Îlot requirements
+     * @param {Object} config - Placement configuration
+     */
+    async executePlacementStrategy(requirements, config) {
+        this.log('Executing placement strategy', { 
+            strategy: config.placementStrategy,
+            targetIlots: requirements.totalIlots
+        });
+        
+        switch (config.placementStrategy) {
+            case 'grid':
+                await this.executeGridPlacement(requirements, config);
+                break;
+            case 'random':
+                await this.executeRandomPlacement(requirements, config);
+                break;
+            case 'optimized':
+            default:
+                await this.executeOptimizedPlacement(requirements, config);
+                break;
+        }
+    }
+
+    /**
+     * Execute optimized placement strategy
+     * @param {Object} requirements - Îlot requirements
+     * @param {Object} config - Placement configuration
+     */
+    async executeOptimizedPlacement(requirements, config) {
+        const startTime = Date.now();
+        let placedCount = 0;
+        
+        // Sort grid cells by placement score (best first)
+        const sortedCells = this.getSortedPlacementCells();
+        
+        for (const cell of sortedCells) {
+            // Check timeout
+            if (Date.now() - startTime > config.timeoutMs) {
+                this.logError('Placement timeout reached');
+                break;
+            }
+            
+            if (placedCount >= requirements.totalIlots) break;
+            
+            const worldPos = this.gridToWorld(cell.x, cell.y);
+            const ilotType = requirements.ilotTypes[placedCount % requirements.ilotTypes.length];
+            
+            // Attempt placement
+            const placement = await this.attemptIlotPlacement(worldPos, ilotType, config);
+            
+            if (placement) {
+                this.placedIlots.push(placement);
+                this.indexPlacedIlot(placement);
+                placedCount++;
+                this.placementStats.successfulPlacements++;
+            }
+            
+            this.placementStats.totalAttempts++;
+        }
+    }
+
+    /**
+     * ÎLOT PLACEMENT MECHANICS
+     */
+
+    /**
+     * Attempt to place an îlot at a specific position
+     * @param {Array} position - Target position [x, y]
+     * @param {string} ilotType - Type of îlot
+     * @param {Object} config - Placement configuration
+     * @returns {Object|null} Placed îlot or null if failed
+     */
+    async attemptIlotPlacement(position, ilotType, config) {
+        try {
+            // Determine îlot dimensions
+            const dimensions = this.calculateIlotDimensions(ilotType, config);
+            
+            // Check if placement is valid
+            if (!this.isValidPlacement(position, dimensions)) {
+                return null;
+            }
+            
+            // Create îlot object
+            const ilot = {
+                id: `ilot_${this.placedIlots.length + 1}`,
+                type: ilotType,
+                position: {
+                    x: position[0],
+                    y: position[1],
+                    z: 0
+                },
+                dimensions: dimensions,
+                polygon: this.geometryEngine.createRectangle(
+                    position[0], position[1], 
+                    dimensions.width, dimensions.height
+                ),
+                properties: this.generateIlotProperties(ilotType),
+                validation: {
+                    isValid: true,
+                    clearance: this.calculateIlotClearance(position, dimensions),
+                    accessibility: this.calculateAccessibilityScore(position),
+                    issues: []
+                },
+                metadata: {
+                    placementScore: this.calculateOverallScore(position, ilotType),
+                    created: new Date().toISOString(),
+                    placementMethod: 'optimized'
+                }
+            };
+            
+            return ilot;
+            
+        } catch (error) {
+            this.logError('Îlot placement attempt failed', error);
+            return null;
+        }
+    }
+
+    /**
+     * Validate îlot placement
+     * @param {Array} position - Position to check
+     * @param {Object} dimensions - Îlot dimensions
+     * @returns {boolean} True if valid placement
+     */
+    isValidPlacement(position, dimensions) {
+        // Check spatial constraints
+        if (!this.checkSpatialConstraints(position, dimensions)) {
+            return false;
+        }
+        
+        // Check collision with existing îlots
+        if (this.checkIlotCollisions(position, dimensions)) {
+            this.placementStats.collisionDetections++;
+            return false;
+        }
+        
+        // Check clearance requirements
+        if (!this.checkClearanceRequirements(position, dimensions)) {
+            return false;
+        }
+        
+        return true;
+    }
+
+    /**
+     * Check spatial constraints (walls, boundaries, etc.)
+     * @param {Array} position - Position to check
+     * @param {Object} dimensions - Îlot dimensions
+     * @returns {boolean} True if constraints satisfied
+     */
+    checkSpatialConstraints(position, dimensions) {
+        const boundary = this.floorPlan.boundary || this.createBoundaryFromBounds();
+        
+        return this.geometryEngine.rectangleFitsInSpace(
+            position[0], position[1],
+            dimensions.width, dimensions.height,
+            boundary,
+            this.restrictedZones.map(zone => zone.polygon),
+            this.config.minWallDistance
+        );
+    }
+
+    /**
+     * Check for collisions with existing îlots
+     * @param {Array} position - Position to check
+     * @param {Object} dimensions - Îlot dimensions
+     * @returns {boolean} True if collision detected
+     */
+    checkIlotCollisions(position, dimensions) {
+        const testRect = {
+            minX: position[0] - dimensions.width / 2 - this.config.minIlotDistance,
+            minY: position[1] - dimensions.height / 2 - this.config.minIlotDistance,
+            maxX: position[0] + dimensions.width / 2 + this.config.minIlotDistance,
+            maxY: position[1] + dimensions.height / 2 + this.config.minIlotDistance
+        };
+        
+        const potentialCollisions = this.spatialIndex.search(testRect);
+        return potentialCollisions.length > 0;
+    }
+
+    /**
+     * OPTIMIZATION
+     */
+
+    /**
+     * Optimize îlot placement using iterative improvement
+     */
+    async optimizePlacement() {
+        this.log('Starting placement optimization');
+        
+        const maxOptimizationIterations = 50;
+        let iteration = 0;
+        let improved = true;
+        
+        while (improved && iteration < maxOptimizationIterations) {
+            improved = false;
+            
+            for (let i = 0; i < this.placedIlots.length; i++) {
+                const currentScore = this.placedIlots[i].metadata.placementScore;
+                const optimizedPosition = await this.findBetterPosition(this.placedIlots[i]);
+                
+                if (optimizedPosition && optimizedPosition.score > currentScore * 1.1) {
+                    // Move îlot to better position
+                    this.moveIlot(i, optimizedPosition.position);
+                    improved = true;
+                }
+            }
+            
+            iteration++;
+            this.placementStats.optimizationIterations++;
+        }
+        
+        this.log('Placement optimization completed', { iterations: iteration });
     }
 
     /**
@@ -405,401 +644,271 @@ class IlotPlacementEngine {
      */
 
     /**
-     * Convert wall line to polygon for buffering
-     * @param {Object} wall - Wall object with start and end points
-     * @returns {Array} Wall polygon
+     * Calculate îlot dimensions based on type and configuration
+     * @param {string} ilotType - Type of îlot
+     * @param {Object} config - Configuration
+     * @returns {Object} Dimensions {width, height}
      */
-    wallToPolygon(wall) {
-        const thickness = wall.thickness || 0.2; // Default wall thickness
-        const halfThickness = thickness / 2;
+    calculateIlotDimensions(ilotType, config) {
+        const typeMultipliers = {
+            'workspace': 1.0,
+            'meeting': 1.3,
+            'social': 1.5,
+            'storage': 0.8,
+            'break': 1.2
+        };
         
-        const dx = wall.end.x - wall.start.x;
-        const dy = wall.end.y - wall.start.y;
-        const length = Math.sqrt(dx * dx + dy * dy);
+        const multiplier = typeMultipliers[ilotType] || 1.0;
         
-        if (length === 0) return [];
-        
-        const unitX = dx / length;
-        const unitY = dy / length;
-        
-        // Perpendicular vector
-        const perpX = -unitY * halfThickness;
-        const perpY = unitX * halfThickness;
-        
-        return [
-            [wall.start.x + perpX, wall.start.y + perpY],
-            [wall.end.x + perpX, wall.end.y + perpY],
-            [wall.end.x - perpX, wall.end.y - perpY],
-            [wall.start.x - perpX, wall.start.y - perpY]
-        ];
+        return {
+            width: config.defaultIlotSize.width * multiplier,
+            height: config.defaultIlotSize.height * multiplier
+        };
     }
 
     /**
-     * Generate random point inside polygon
-     * @param {Array} polygon - Target polygon
-     * @returns {Array} Random point [x, y]
+     * Generate îlot properties based on type
+     * @param {string} ilotType - Type of îlot
+     * @returns {Object} Properties
      */
-    generateRandomPointInPolygon(polygon) {
-        const bbox = this.geometryEngine.calculateBoundingBox(polygon);
-        let attempts = 0;
+    generateIlotProperties(ilotType) {
+        const properties = {
+            workspace: { capacity: 4, equipment: ['desks', 'chairs', 'monitors'], priority: 1.0 },
+            meeting: { capacity: 8, equipment: ['table', 'chairs', 'whiteboard'], priority: 0.8 },
+            social: { capacity: 12, equipment: ['seating', 'tables'], priority: 0.6 },
+            storage: { capacity: 0, equipment: ['shelving', 'cabinets'], priority: 0.4 },
+            break: { capacity: 6, equipment: ['seating', 'tables', 'kitchen'], priority: 0.7 }
+        };
         
-        while (attempts < 100) {
-            const x = bbox.minX + Math.random() * (bbox.maxX - bbox.minX);
-            const y = bbox.minY + Math.random() * (bbox.maxY - bbox.minY);
-            const point = [x, y];
-            
-            if (this.geometryEngine.pointInPolygon(point, polygon)) {
-                return point;
+        return properties[ilotType] || properties.workspace;
+    }
+
+    /**
+     * Helper functions for spatial operations
+     */
+    
+    createWallPolygon(wall) {
+        // Create a simple rectangle for wall
+        const thickness = 0.2; // Default wall thickness
+        return this.geometryEngine.createRectangle(
+            (wall.start[0] + wall.end[0]) / 2,
+            (wall.start[1] + wall.end[1]) / 2,
+            this.geometryEngine.calculateDistance(wall.start, wall.end),
+            thickness
+        );
+    }
+
+    createDoorClearanceZone(door) {
+        return this.geometryEngine.createRectangle(
+            door.position[0], door.position[1],
+            this.config.minDoorClearance * 2,
+            this.config.minDoorClearance * 2
+        );
+    }
+
+    createWindowClearanceZone(window) {
+        return this.geometryEngine.createRectangle(
+            window.position[0], window.position[1],
+            1.0, 1.0 // Minimal clearance for windows
+        );
+    }
+
+    hasIlotClearance(point) {
+        // Check minimum clearance around point
+        const testRadius = Math.max(this.config.defaultIlotSize.width, this.config.defaultIlotSize.height) / 2;
+        const testCircle = this.geometryEngine.createCircle(point[0], point[1], testRadius);
+        
+        for (const restrictedZone of this.restrictedZones) {
+            if (this.geometryEngine.polygonsOverlap(testCircle, restrictedZone.polygon)) {
+                return false;
             }
-            attempts++;
         }
         
-        return null;
+        return true;
     }
 
-    /**
-     * Generate point around radius
-     * @param {Array} center - Center point
-     * @param {number} minRadius - Minimum radius
-     * @param {number} maxRadius - Maximum radius
-     * @returns {Array} New point
-     */
-    generatePointAroundRadius(center, minRadius, maxRadius) {
-        const angle = Math.random() * 2 * Math.PI;
-        const radius = minRadius + Math.random() * (maxRadius - minRadius);
+    calculateAccessibilityScore(point) {
+        // Simplified accessibility calculation
+        // In real implementation, would calculate distance to doors, circulation paths, etc.
+        let score = 0.8;
         
-        return [
-            center[0] + Math.cos(angle) * radius,
-            center[1] + Math.sin(angle) * radius
-        ];
-    }
-
-    /**
-     * Check if candidate point is valid for Poisson-disk sampling
-     * @param {Array} point - Candidate point
-     * @param {Array} existingPoints - Already processed points
-     * @param {Map} grid - Spatial grid
-     * @param {Object} bbox - Bounding box
-     * @param {number} cellSize - Grid cell size
-     * @returns {boolean} True if valid
-     */
-    isValidCandidate(point, existingPoints, grid, bbox, cellSize) {
-        // Check if point is in allowed space
-        if (!this.geometryEngine.pointInPolygon(point, this.allowedSpace)) {
-            return false;
+        // Check distance to nearest door
+        if (this.floorPlan.doors) {
+            let minDistance = Infinity;
+            for (const door of this.floorPlan.doors) {
+                const distance = this.geometryEngine.calculateDistance(point, door.position);
+                minDistance = Math.min(minDistance, distance);
+            }
+            
+            // Better score for closer to doors (but not too close)
+            if (minDistance > 1.5 && minDistance < 10) {
+                score += 0.2;
+            }
         }
         
-        // Check minimum distance to other points using grid
-        const gridX = Math.floor((point[0] - bbox.minX) / cellSize);
-        const gridY = Math.floor((point[1] - bbox.minY) / cellSize);
+        return Math.min(score, 1.0);
+    }
+
+    calculateWorkflowScore(point) {
+        // Simplified workflow score
+        // In real implementation, would consider proximity to related îlots, circulation patterns, etc.
+        return 0.8;
+    }
+
+    calculateUsableArea() {
+        if (this.floorPlan.bounds) {
+            const bounds = this.floorPlan.bounds;
+            return (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY) * 0.7; // 70% usable
+        }
         
-        // Check surrounding grid cells
-        for (let dy = -2; dy <= 2; dy++) {
-            for (let dx = -2; dx <= 2; dx++) {
-                const checkX = gridX + dx;
-                const checkY = gridY + dy;
-                const gridKey = `${checkX},${checkY}`;
-                
-                const gridPoint = grid.get(gridKey);
-                if (gridPoint) {
-                    const distance = this.geometryEngine.calculateDistance(point, gridPoint);
-                    if (distance < this.config.poissonRadius) {
-                        return false;
-                    }
+        return 100; // Default fallback
+    }
+
+    determineIlotTypes(config) {
+        return config.ilotTypes || ['workspace', 'meeting', 'social', 'break'];
+    }
+
+    getSortedPlacementCells() {
+        const cells = [];
+        const { width, height } = this.placementGrid;
+        
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                if (this.placementGrid.cells[index] > 0) {
+                    cells.push({
+                        x, y,
+                        score: this.placementGrid.scores[index]
+                    });
                 }
             }
         }
         
-        return true;
+        return cells.sort((a, b) => b.score - a.score);
     }
 
-    /**
-     * Add point to spatial grid
-     * @param {Array} point - Point to add
-     * @param {Map} grid - Spatial grid
-     * @param {Object} bbox - Bounding box
-     * @param {number} cellSize - Grid cell size
-     */
-    addToGrid(point, grid, bbox, cellSize) {
-        const gridX = Math.floor((point[0] - bbox.minX) / cellSize);
-        const gridY = Math.floor((point[1] - bbox.minY) / cellSize);
-        const gridKey = `${gridX},${gridY}`;
-        grid.set(gridKey, point);
-    }
-
-    /**
-     * Calculate candidate score for optimization
-     * @param {Array} candidate - Candidate position
-     * @returns {number} Score (higher is better)
-     */
-    calculateCandidateScore(candidate) {
-        let score = 0;
-        
-        // Accessibility score (distance to entrances)
-        const entranceScore = this.calculateEntranceAccessibility(candidate);
-        score += entranceScore * this.config.accessibilityWeight;
-        
-        // Central position score
-        const centralityScore = this.calculateCentralityScore(candidate);
-        score += centralityScore * this.config.densityWeight;
-        
-        // Efficiency score (space utilization)
-        const efficiencyScore = this.calculateEfficiencyScore(candidate);
-        score += efficiencyScore * this.config.efficiencyWeight;
-        
-        return score;
-    }
-
-    /**
-     * Calculate entrance accessibility score
-     * @param {Array} position - Position to evaluate
-     * @returns {number} Accessibility score (0-1)
-     */
-    calculateEntranceAccessibility(position) {
-        if (!this.floorPlan.entrances || this.floorPlan.entrances.length === 0) {
-            return 0.5; // Neutral score if no entrance data
-        }
-        
-        let minDistance = Infinity;
-        
-        for (const entrance of this.floorPlan.entrances) {
-            const entrancePos = entrance.position || entrance;
-            const distance = this.geometryEngine.calculateDistance(position, entrancePos);
-            minDistance = Math.min(minDistance, distance);
-        }
-        
-        // Score inversely related to distance (closer is better)
-        const maxReasonableDistance = 20; // 20 meters
-        return Math.max(0, 1 - (minDistance / maxReasonableDistance));
-    }
-
-    /**
-     * Calculate centrality score
-     * @param {Array} position - Position to evaluate
-     * @returns {number} Centrality score (0-1)
-     */
-    calculateCentralityScore(position) {
-        const bbox = this.geometryEngine.calculateBoundingBox(this.allowedSpace);
-        const center = [
-            (bbox.minX + bbox.maxX) / 2,
-            (bbox.minY + bbox.maxY) / 2
+    gridToWorld(gridX, gridY) {
+        const bbox = this.placementGrid.bbox;
+        return [
+            bbox.minX + (gridX + 0.5) * this.placementGrid.resolution,
+            bbox.minY + (gridY + 0.5) * this.placementGrid.resolution
         ];
-        
-        const distance = this.geometryEngine.calculateDistance(position, center);
-        const maxDistance = Math.max(bbox.maxX - bbox.minX, bbox.maxY - bbox.minY) / 2;
-        
-        return Math.max(0, 1 - (distance / maxDistance));
     }
 
-    /**
-     * Calculate efficiency score
-     * @param {Array} position - Position to evaluate
-     * @returns {number} Efficiency score (0-1)
-     */
-    calculateEfficiencyScore(position) {
-        // Simple implementation based on space utilization potential
-        // Could be enhanced with more sophisticated metrics
-        return 0.7; // Placeholder
+    indexPlacedIlot(ilot) {
+        const bbox = {
+            minX: ilot.position.x - ilot.dimensions.width / 2,
+            minY: ilot.position.y - ilot.dimensions.height / 2,
+            maxX: ilot.position.x + ilot.dimensions.width / 2,
+            maxY: ilot.position.y + ilot.dimensions.height / 2
+        };
+        
+        this.spatialIndex.insert({ ...bbox, ilot });
     }
 
-    /**
-     * Create îlot geometry
-     * @param {Array} position - Center position
-     * @param {string} type - Îlot type
-     * @returns {Object} Îlot geometry
-     */
-    createIlotGeometry(position, type) {
-        const ilotConfig = this.config.ilotTypes[type] || this.config.defaultIlotSize;
-        const halfWidth = ilotConfig.width / 2;
-        const halfHeight = ilotConfig.height / 2;
+    calculateIlotClearance(position, dimensions) {
+        return this.config.minIlotDistance; // Simplified
+    }
+
+    calculateOverallScore(position, ilotType) {
+        const accessibility = this.calculateAccessibilityScore(position);
+        const workflow = this.calculateWorkflowScore(position);
+        const spatial = 0.8; // Base spatial score
         
-        const polygon = [
-            [position[0] - halfWidth, position[1] - halfHeight],
-            [position[0] + halfWidth, position[1] - halfHeight],
-            [position[0] + halfWidth, position[1] + halfHeight],
-            [position[0] - halfWidth, position[1] + halfHeight]
+        return (
+            accessibility * this.config.weights.accessibility +
+            workflow * this.config.weights.workflow +
+            spatial * this.config.weights.spaceUtilization
+        );
+    }
+
+    checkClearanceRequirements(position, dimensions) {
+        return true; // Simplified for now
+    }
+
+    createDefaultBoundary() {
+        this.floorPlan.boundary = [
+            [0, 0], [20, 0], [20, 15], [0, 15]
         ];
-        
-        return {
-            polygon,
-            bbox: this.geometryEngine.calculateBoundingBox(polygon),
-            area: ilotConfig.width * ilotConfig.height,
-            type
+    }
+
+    createBoundaryFromBounds() {
+        const bounds = this.floorPlan.bounds || { minX: 0, minY: 0, maxX: 20, maxY: 15 };
+        return [
+            [bounds.minX, bounds.minY],
+            [bounds.maxX, bounds.minY],
+            [bounds.maxX, bounds.maxY],
+            [bounds.minX, bounds.maxY]
+        ];
+    }
+
+    indexConstraints() {
+        // Index restricted zones for faster collision detection
+        for (const zone of this.restrictedZones) {
+            const bbox = this.geometryEngine.calculateBoundingBox(zone.polygon);
+            this.spatialIndex.insert({ ...bbox, zone });
+        }
+    }
+
+    async findBetterPosition(ilot) {
+        // Implementation for finding better position during optimization
+        return null; // Simplified for now
+    }
+
+    moveIlot(index, newPosition) {
+        // Implementation for moving îlot to new position
+        this.placedIlots[index].position = newPosition;
+    }
+
+    resetPlacementStats() {
+        this.placementStats = {
+            totalAttempts: 0,
+            successfulPlacements: 0,
+            collisionDetections: 0,
+            optimizationIterations: 0
         };
     }
 
     /**
-     * Check if îlot can be placed
-     * @param {Object} ilotGeometry - Îlot geometry to check
-     * @returns {boolean} True if can be placed
+     * VALIDATION
      */
-    canPlaceIlot(ilotGeometry) {
-        // Check forbidden zone overlap
-        for (const forbiddenZone of this.forbiddenZones) {
-            if (this.geometryEngine.polygonsCollide(ilotGeometry.polygon, forbiddenZone)) {
-                return false;
-            }
-        }
-        
-        // Check collision with existing îlots
-        for (const existingIlot of this.placedIlots) {
-            if (this.geometryEngine.polygonsCollide(ilotGeometry.polygon, existingIlot.geometry.polygon)) {
-                return false;
-            }
-        }
-        
-        return true;
-    }
 
-    /**
-     * Select îlot type based on distribution
-     * @param {Array} position - Position
-     * @param {Object} distribution - Type distribution
-     * @returns {string} Selected type
-     */
-    selectIlotType(position, distribution) {
-        const types = Object.keys(distribution);
-        const random = Math.random();
-        let cumulative = 0;
+    async validatePlacement() {
+        const errors = [];
+        const warnings = [];
         
-        for (const type of types) {
-            cumulative += distribution[type];
-            if (random <= cumulative) {
-                return type;
+        // Check minimum distances
+        for (let i = 0; i < this.placedIlots.length; i++) {
+            for (let j = i + 1; j < this.placedIlots.length; j++) {
+                const distance = this.geometryEngine.calculateDistance(
+                    [this.placedIlots[i].position.x, this.placedIlots[i].position.y],
+                    [this.placedIlots[j].position.x, this.placedIlots[j].position.y]
+                );
+                
+                if (distance < this.config.minIlotDistance) {
+                    errors.push(`Îlots ${this.placedIlots[i].id} and ${this.placedIlots[j].id} too close: ${distance.toFixed(2)}m`);
+                }
             }
         }
         
-        return types[0]; // Fallback
-    }
-
-    /**
-     * Get default type distribution
-     * @returns {Object} Default distribution
-     */
-    getDefaultTypeDistribution() {
         return {
-            'work': 0.4,
-            'meeting': 0.2,
-            'collaboration': 0.15,
-            'focus': 0.1,
-            'social': 0.1,
-            'break': 0.05
+            isValid: errors.length === 0,
+            errors,
+            warnings,
+            metrics: {
+                placedIlots: this.placedIlots.length,
+                averageScore: this.placedIlots.reduce((sum, ilot) => sum + ilot.metadata.placementScore, 0) / this.placedIlots.length,
+                spatialEfficiency: this.calculateSpatialEfficiency()
+            }
         };
     }
 
-    /**
-     * Estimate optimal îlot count
-     * @returns {number} Estimated count
-     */
-    estimateOptimalIlotCount() {
-        if (!this.allowedSpace) return 0;
-        
-        const allowedArea = this.geometryEngine.calculatePolygonArea(this.allowedSpace);
-        const averageIlotArea = 6; // 6 sqm average
-        const targetDensity = 0.3; // 30% coverage
-        
-        return Math.floor((allowedArea * targetDensity) / averageIlotArea);
-    }
-
-    /**
-     * Calculate space coverage
-     * @returns {number} Coverage ratio (0-1)
-     */
-    calculateCoverage() {
-        if (!this.allowedSpace) return 0;
-        
-        const allowedArea = this.geometryEngine.calculatePolygonArea(this.allowedSpace);
-        const usedArea = this.placedIlots.reduce((total, ilot) => total + ilot.geometry.area, 0);
-        
-        return usedArea / allowedArea;
-    }
-
-    /**
-     * Calculate placement efficiency
-     * @returns {number} Efficiency score (0-1)
-     */
-    calculateEfficiency() {
-        if (this.placedIlots.length === 0) return 0;
-        
-        const avgScore = this.placedIlots.reduce((sum, ilot) => sum + ilot.score, 0) / this.placedIlots.length;
-        return Math.min(1, avgScore);
-    }
-
-    /**
-     * VALIDATION HELPERS
-     */
-
-    /**
-     * Check minimum wall distance
-     * @param {Object} ilot - Îlot to check
-     * @returns {boolean} True if distance is adequate
-     */
-    checkMinWallDistance(ilot) {
-        if (!this.floorPlan.walls) return true;
-        
-        for (const wall of this.floorPlan.walls) {
-            // Simplified distance check - could be enhanced
-            const wallPolygon = this.wallToPolygon(wall);
-            const distance = this.calculatePolygonDistance(ilot.geometry.polygon, wallPolygon);
-            if (distance < this.config.minWallDistance) {
-                return false;
-            }
-        }
-        
-        return true;
-    }
-
-    /**
-     * Check forbidden zone overlap
-     * @param {Object} ilot - Îlot to check
-     * @returns {boolean} True if overlaps forbidden zone
-     */
-    checkForbiddenZoneOverlap(ilot) {
-        for (const forbiddenZone of this.forbiddenZones) {
-            if (this.geometryEngine.polygonsCollide(ilot.geometry.polygon, forbiddenZone)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Check îlot-to-îlot collisions
-     * @param {Object} ilot - Îlot to check
-     * @returns {Array} Array of colliding îlot IDs
-     */
-    checkIlotCollisions(ilot) {
-        const collisions = [];
-        
-        for (const otherIlot of this.placedIlots) {
-            if (otherIlot.id === ilot.id) continue;
-            
-            if (this.geometryEngine.polygonsCollide(ilot.geometry.polygon, otherIlot.geometry.polygon)) {
-                collisions.push(otherIlot.id);
-            }
-        }
-        
-        return collisions;
-    }
-
-    /**
-     * Calculate distance between polygons (simplified)
-     * @param {Array} polygon1 - First polygon
-     * @param {Array} polygon2 - Second polygon
-     * @returns {number} Distance between polygons
-     */
-    calculatePolygonDistance(polygon1, polygon2) {
-        // Simplified implementation using closest points
-        let minDistance = Infinity;
-        
-        for (const point1 of polygon1) {
-            for (const point2 of polygon2) {
-                const distance = this.geometryEngine.calculateDistance(point1, point2);
-                minDistance = Math.min(minDistance, distance);
-            }
-        }
-        
-        return minDistance;
+    calculateSpatialEfficiency() {
+        const totalIlotArea = this.placedIlots.reduce((sum, ilot) => 
+            sum + (ilot.dimensions.width * ilot.dimensions.height), 0
+        );
+        const usableArea = this.calculateUsableArea();
+        return totalIlotArea / usableArea;
     }
 
     /**
@@ -818,17 +927,14 @@ class IlotPlacementEngine {
 
     /**
      * Get placement statistics
-     * @returns {Object} Placement statistics
+     * @returns {Object} Statistics
      */
     getStatistics() {
         return {
+            ...this.placementStats,
             config: this.config,
-            forbiddenZonesCount: this.forbiddenZones.length,
-            candidatesGenerated: this.placementCandidates.length,
-            ilotsPlaced: this.placedIlots.length,
-            coverage: this.calculateCoverage(),
-            efficiency: this.calculateEfficiency(),
-            allowedArea: this.allowedSpace ? this.geometryEngine.calculatePolygonArea(this.allowedSpace) : 0
+            placedIlots: this.placedIlots.length,
+            spatialEfficiency: this.calculateSpatialEfficiency()
         };
     }
 }

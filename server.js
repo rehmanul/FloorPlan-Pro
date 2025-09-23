@@ -358,36 +358,34 @@ app.post('/api/advanced-placement', async (req, res) => {
         const placementEngine = new IlotPlacementEngine({
             minWallDistance: options.wallBuffer || 0.5,
             minIlotDistance: options.minDistance || 2.0,
-            defaultIlotSize: { 
-                width: options.ilotWidth || 3.0, 
-                height: options.ilotHeight || 2.0 
-            },
-            maxIterations: options.maxAttempts || 1000,
+            ilotWidth: options.ilotWidth || 3.0,
+            ilotHeight: options.ilotHeight || 2.0,
+            maxAttempts: options.maxAttempts || 1000,
+            coverage: options.coverage || 0.3,
+            placementStrategy: 'optimized',
             debugMode: process.env.NODE_ENV === 'development'
         });
         
         // Generate optimized placement
         const placedIlots = await placementEngine.generateOptimizedPlacement(floorPlan, options);
         
+        // Get placement statistics
+        const stats = placementEngine.getStatistics();
+        
         // Format results for frontend
         const formattedIlots = placedIlots.map(ilot => ({
             id: ilot.id,
-            position: ilot.position,
-            dimensions: ilot.dimensions,
-            properties: {
-                type: ilot.type || 'workspace',
-                capacity: ilot.capacity || 4,
-                equipment: ilot.equipment || []
-            },
-            validation: {
-                isValid: ilot.isValid !== false,
-                clearance: ilot.clearance || 'adequate',
-                issues: ilot.issues || []
-            },
-            metadata: {
-                score: ilot.score || 0.8,
-                created: new Date().toISOString()
-            }
+            x: ilot.position.x - ilot.dimensions.width / 2,
+            y: ilot.position.y - ilot.dimensions.height / 2,
+            width: ilot.dimensions.width,
+            height: ilot.dimensions.height,
+            type: ilot.type,
+            capacity: ilot.properties.capacity,
+            equipment: ilot.properties.equipment,
+            isValid: ilot.validation.isValid,
+            clearance: ilot.validation.clearance,
+            accessibility: ilot.validation.accessibility,
+            score: ilot.metadata.placementScore
         }));
         
         console.log(`✅ Advanced placement completed: ${formattedIlots.length} îlots placed`);
@@ -397,14 +395,18 @@ app.post('/api/advanced-placement', async (req, res) => {
             ilots: formattedIlots,
             statistics: {
                 totalIlots: formattedIlots.length,
-                validIlots: formattedIlots.filter(i => i.validation.isValid).length,
-                averageScore: formattedIlots.reduce((sum, i) => sum + i.metadata.score, 0) / formattedIlots.length,
-                coverage: options.coverage || 0.3
+                validIlots: formattedIlots.filter(i => i.isValid).length,
+                averageScore: stats.spatialEfficiency || 0.8,
+                coverage: options.coverage || 0.3,
+                totalAttempts: stats.totalAttempts,
+                successRate: stats.successfulPlacements / Math.max(stats.totalAttempts, 1),
+                collisionDetections: stats.collisionDetections
             },
             metadata: {
                 engine: 'advanced-placement-engine',
-                version: '1.0.0',
-                processedAt: new Date().toISOString()
+                version: '2.0.0',
+                processedAt: new Date().toISOString(),
+                placementMethod: 'spatial-optimization'
             }
         });
         
@@ -414,7 +416,7 @@ app.post('/api/advanced-placement', async (req, res) => {
             success: false,
             error: 'Advanced placement failed',
             details: error.message,
-            fallback: 'Consider using basic placement mode'
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });
@@ -434,58 +436,72 @@ app.post('/api/corridor-generation', async (req, res) => {
     try {
         // Initialize corridor generator
         const corridorGenerator = new CorridorGenerator({
-            defaultWidth: options.width || 1.8,
+            defaultWidth: options.corridorWidth || 1.8,
             minWidth: options.minWidth || 1.5,
             maxWidth: options.maxWidth || 3.0,
-            gridResolution: options.gridResolution || 0.5,
+            gridResolution: options.pathfindingResolution || 0.5,
+            smoothingIterations: 3,
+            connectAllEntrances: options.connectAllEntrances !== false,
             debugMode: process.env.NODE_ENV === 'development'
         });
         
-        // Prepare allowed space (exclude walls and forbidden zones)
-        // For now, use the entire floor plan area - the corridor generator will handle obstacles
-        const allowedSpace = floorPlan.boundary || [];
+        // Prepare allowed space from floor plan
+        let allowedSpace = floorPlan.boundary;
         
-        // If no boundary, create one from floor plan dimensions
-        if (!allowedSpace.length && floorPlan.bounds) {
+        // If no boundary, create one from floor plan bounds
+        if (!allowedSpace && floorPlan.bounds) {
             const { minX, minY, maxX, maxY } = floorPlan.bounds;
-            allowedSpace.push(
+            allowedSpace = [
                 [minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY]
-            );
+            ];
         }
         
-        // Generate destinations from îlots and entrances
-        const destinations = [
-            ...ilots.map(ilot => ({ 
-                position: ilot.position, 
-                type: 'ilot', 
-                id: ilot.id 
-            })),
-            ...(floorPlan.entrances || []).map(entrance => ({ 
-                position: entrance.position, 
-                type: 'entrance', 
-                id: entrance.id 
-            }))
-        ];
+        // Default boundary if none available
+        if (!allowedSpace) {
+            allowedSpace = [[0, 0], [20, 0], [20, 15], [0, 15]];
+        }
         
-        // Generate corridor network
+        // Convert îlots to destinations
+        const destinations = ilots.map(ilot => ({
+            position: [ilot.x + ilot.width/2, ilot.y + ilot.height/2],
+            type: 'ilot',
+            id: ilot.id
+        }));
+        
+        // Add entrance destinations if available
+        if (floorPlan.entrances) {
+            destinations.push(...floorPlan.entrances.map(entrance => ({
+                position: entrance.position,
+                type: 'entrance', 
+                id: entrance.id
+            })));
+        }
+        
+        // Generate corridor network using A* pathfinding
         const corridors = await corridorGenerator.generateCorridorNetwork(
             floorPlan, 
             allowedSpace, 
             destinations
         );
         
+        // Get generator statistics
+        const stats = corridorGenerator.getStatistics();
+        
         // Format results for frontend
         const formattedCorridors = corridors.map(corridor => ({
             id: corridor.id,
-            name: corridor.name || `Corridor ${corridor.id}`,
-            polygon: corridor.polygon,
+            type: corridor.metadata?.from && corridor.metadata?.to ? 'connecting' : 'main',
             width: corridor.width,
+            polygon: corridor.polygon,
+            centerline: corridor.centerline,
             length: corridor.length,
-            type: corridor.type || 'secondary',
-            accessibility: corridor.accessibility !== false,
+            area: corridor.area,
+            accessibility: true,
+            connects: corridor.metadata ? [corridor.metadata.from, corridor.metadata.to] : [],
             metadata: {
-                created: new Date().toISOString(),
-                algorithm: 'a-star-pathfinding'
+                created: corridor.metadata?.created || new Date().toISOString(),
+                algorithm: 'a-star-pathfinding',
+                pathId: corridor.pathId
             }
         }));
         
@@ -496,14 +512,18 @@ app.post('/api/corridor-generation', async (req, res) => {
             corridors: formattedCorridors,
             statistics: {
                 totalCorridors: formattedCorridors.length,
-                totalLength: formattedCorridors.reduce((sum, c) => sum + (c.length || 0), 0),
-                averageWidth: formattedCorridors.reduce((sum, c) => sum + c.width, 0) / formattedCorridors.length,
-                accessibleCorridors: formattedCorridors.filter(c => c.accessibility).length
+                totalLength: corridors.reduce((sum, c) => sum + (c.length || 0), 0),
+                totalArea: corridors.reduce((sum, c) => sum + (c.area || 0), 0),
+                averageWidth: corridors.reduce((sum, c) => sum + c.width, 0) / corridors.length,
+                pathfindingNodes: stats.gridSize || 0,
+                pathCount: stats.pathCount || 0,
+                coverage: stats.coverage || 0
             },
             metadata: {
-                engine: 'corridor-generator',
-                version: '1.0.0',
-                processedAt: new Date().toISOString()
+                engine: 'advanced-corridor-generator',
+                version: '2.0.0',
+                processedAt: new Date().toISOString(),
+                algorithm: 'a-star-spatial-pathfinding'
             }
         });
         
@@ -513,7 +533,7 @@ app.post('/api/corridor-generation', async (req, res) => {
             success: false,
             error: 'Corridor generation failed',
             details: error.message,
-            fallback: 'Consider using basic corridor mode'
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });

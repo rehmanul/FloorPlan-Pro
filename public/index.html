@@ -2356,24 +2356,6 @@
                 hideStatusOverlay();
                 console.error('Advanced îlot placement failed:', error);
                 showNotification(`Advanced îlot placement failed: ${error.message}`, 'error');
-
-                // Fallback to simple placement if advanced fails
-                try {
-                    showNotification('Attempting fallback placement method...', 'info');
-                    generatedIlots = generateSimpleFallbackIlots(currentFloorPlan, coverage);
-
-                    if (canvas && canvas.render) {
-                        canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
-                        canvas.fitToView();
-                    }
-
-                    updateIlotsList();
-                    updateAnalysisStats();
-
-                    showNotification(`Fallback placement: Generated ${generatedIlots.length} basic îlots`, 'warning');
-                } catch (fallbackError) {
-                    showNotification('All placement methods failed', 'error');
-                }
             }
         }
 
@@ -2527,24 +2509,6 @@
                 hideStatusOverlay();
                 console.error('Advanced corridor generation failed:', error);
                 showNotification(`Advanced corridor generation failed: ${error.message}`, 'error');
-
-                // Fallback to simple corridor generation
-                try {
-                    showNotification('Attempting fallback corridor generation...', 'info');
-                    corridorNetwork = generateSimpleFallbackCorridors(currentFloorPlan, generatedIlots, width);
-
-                    if (canvas && canvas.render) {
-                        canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
-                        canvas.fitToView();
-                    }
-
-                    updateCorridorsList();
-                    updateAnalysisStats();
-
-                    showNotification(`Fallback corridors: Generated ${corridorNetwork.length} basic corridors`, 'warning');
-                } catch (fallbackError) {
-                    showNotification('All corridor generation methods failed', 'error');
-                }
             }
         }
 
