@@ -22,12 +22,23 @@ const CorridorGenerator = require('./src/corridor-generator');
 // --- CONFIGURATION & VALIDATION ---
 // Debug: Check all environment variables
 console.log('🔍 Debug - All environment variables starting with APS or FORGE:');
-Object.keys(process.env).filter(key => key.startsWith('APS') || key.startsWith('FORGE')).forEach(key => {
-    console.log(`   ${key}: ${process.env[key] ? `${process.env[key].substring(0, 8)}...` : 'NOT SET'}`);
-});
+const relevantEnvVars = Object.keys(process.env).filter(key => key.startsWith('APS') || key.startsWith('FORGE'));
+if (relevantEnvVars.length > 0) {
+    relevantEnvVars.forEach(key => {
+        console.log(`   ${key}: ${process.env[key] ? `${process.env[key].substring(0, 8)}...` : 'NOT SET'}`);
+    });
+} else {
+    console.log('   No APS or FORGE environment variables found');
+    console.log('🔍 Checking all environment variables for debugging:');
+    // Show first few characters of all env vars to help debug
+    Object.keys(process.env).slice(0, 10).forEach(key => {
+        console.log(`   ${key}: ${process.env[key] ? 'SET' : 'NOT SET'}`);
+    });
+}
 
-const APS_CLIENT_ID = process.env.APS_CLIENT_ID || process.env.FORGE_CLIENT_ID;
-const APS_CLIENT_SECRET = process.env.APS_CLIENT_SECRET || process.env.FORGE_CLIENT_SECRET;
+// Try multiple ways to get the credentials
+const APS_CLIENT_ID = process.env.APS_CLIENT_ID || process.env.FORGE_CLIENT_ID || process.env['APS_CLIENT_ID'] || process.env['FORGE_CLIENT_ID'];
+const APS_CLIENT_SECRET = process.env.APS_CLIENT_SECRET || process.env.FORGE_CLIENT_SECRET || process.env['APS_CLIENT_SECRET'] || process.env['FORGE_CLIENT_SECRET'];
 
 console.log('🔧 Environment Check:');
 console.log('   NODE_ENV:', process.env.NODE_ENV || 'not set');
