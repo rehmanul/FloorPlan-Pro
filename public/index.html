@@ -358,25 +358,18 @@
             cursor: pointer; 
         }
         
-        .legend { 
-            position: absolute; 
-            top: 20px; 
-            right: 20px; 
-            background: rgba(255, 255, 255, 0.95); 
-            padding: 1rem; 
-            border-radius: 8px; 
-            border: 1px solid var(--border); 
-            z-index: 100;
-            -webkit-backdrop-filter: blur(10px);
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-        }
         
+        
+        .legend-content {
+            padding: 0.5rem 0;
+        }
+
         .legend-item { 
             display: flex; 
             align-items: center; 
             gap: 0.75rem; 
-            margin-bottom: 0.5rem; 
+            margin-bottom: 0.75rem; 
+            font-size: 0.9rem;
         }
         
         .legend-color { 
@@ -546,6 +539,32 @@
                     </div>
 
                     <div class="section">
+                        <h4>Elements Legend</h4>
+                        <div class="legend-content">
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: var(--wall-color);"></div>
+                                <span>Walls</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: var(--restricted-color);"></div>
+                                <span>Restricted Areas</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: var(--entrance-color);"></div>
+                                <span>Entrances/Exits</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: var(--ilot-color);"></div>
+                                <span>Îlots</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color" style="background: var(--corridor-color);"></div>
+                                <span>Corridors</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
                         <h4>Detected Elements</h4>
                         <div id="elementsList" class="list-container">
                             <p class="text-secondary">Upload a CAD file to detect elements.</p>
@@ -594,30 +613,7 @@
                     <button id="measureTool" class="tool-btn" title="Measure"><i class="fas fa-ruler"></i></button>
                 </div>
 
-                <!-- Legend -->
-                <div class="legend">
-                    <h5 style="margin-bottom: 1rem;">Elements Legend</h5>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: var(--wall-color);"></div>
-                        <span>Walls</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: var(--restricted-color);"></div>
-                        <span>Restricted Areas</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: var(--entrance-color);"></div>
-                        <span>Entrances/Exits</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: var(--ilot-color);"></div>
-                        <span>Îlots</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: var(--corridor-color);"></div>
-                        <span>Corridors</span>
-                    </div>
-                </div>
+                
 
                 <!-- Canvas for Floor Plan Rendering -->
                 <canvas id="floorPlanCanvas"></canvas>
