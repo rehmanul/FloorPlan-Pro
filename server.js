@@ -20,6 +20,12 @@ const IlotPlacementEngine = require('./src/ilot-placement-engine');
 const CorridorGenerator = require('./src/corridor-generator');
 
 // --- CONFIGURATION & VALIDATION ---
+// Debug: Check all environment variables
+console.log('🔍 Debug - All environment variables starting with APS or FORGE:');
+Object.keys(process.env).filter(key => key.startsWith('APS') || key.startsWith('FORGE')).forEach(key => {
+    console.log(`   ${key}: ${process.env[key] ? `${process.env[key].substring(0, 8)}...` : 'NOT SET'}`);
+});
+
 const APS_CLIENT_ID = process.env.APS_CLIENT_ID || process.env.FORGE_CLIENT_ID;
 const APS_CLIENT_SECRET = process.env.APS_CLIENT_SECRET || process.env.FORGE_CLIENT_SECRET;
 
