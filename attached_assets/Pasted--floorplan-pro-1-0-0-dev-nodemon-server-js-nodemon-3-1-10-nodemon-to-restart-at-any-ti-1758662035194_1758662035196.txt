@@ -1,0 +1,147 @@
+
+> floorplan-pro@1.0.0 dev
+> nodemon server.js
+
+[nodemon] 3.1.10
+[nodemon] to restart at any time, enter `rs`
+[nodemon] watching path(s): *.*
+[nodemon] watching extensions: js,mjs,cjs,json
+[nodemon] starting `node server.js`
+[dotenv@17.2.1] injecting env (0) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+/home/runner/workspace/src/geometry-engine.js:18
+const RBush = require('rbush');
+              ^
+
+Error [ERR_REQUIRE_ESM]: require() of ES Module /home/runner/workspace/node_modules/rbush/index.js from /home/runner/workspace/src/geometry-engine.js not supported.
+Instead change the require of index.js in /home/runner/workspace/src/geometry-engine.js to a dynamic import() which is available in all CommonJS modules.
+    at Object.<anonymous> (/home/runner/workspace/src/geometry-engine.js:18:15)
+    at Object.<anonymous> (/home/runner/workspace/src/dxf-processor.js:25:24)
+    at Object.<anonymous> (/home/runner/workspace/server.js:16:22) {
+  code: 'ERR_REQUIRE_ESM'
+}
+[nodemon] app crashed - waiting for file changes before starting...
+[nodemon] restarting child process
+[nodemon] starting `node server.js`
+[dotenv@17.2.1] injecting env (0) from .env -- tip: 📡 auto-backup env with Radar: https://dotenvx.com/radar
+/home/runner/workspace/src/geometry-engine.js:18
+const RBush = require('rbush');
+              ^
+
+Error [ERR_REQUIRE_ESM]: require() of ES Module /home/runner/workspace/node_modules/rbush/index.js from /home/runner/workspace/src/geometry-engine.js not supported.
+Instead change the require of index.js in /home/runner/workspace/src/geometry-engine.js to a dynamic import() which is available in all CommonJS modules.
+    at Object.<anonymous> (/home/runner/workspace/src/geometry-engine.js:18:15)
+    at Object.<anonymous> (/home/runner/workspace/src/dxf-processor.js:25:24)
+    at Object.<anonymous> (/home/runner/workspace/server.js:16:22) {
+  code: 'ERR_REQUIRE_ESM'
+}
+[nodemon] app crashed - waiting for file changes before starting...
+[nodemon] restarting due to changes...
+[nodemon] starting `node server.js`
+[nodemon] restarting due to changes...
+[nodemon] starting `node server.js`
+[dotenv@17.2.1] injecting env (0) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+node:internal/modules/cjs/loader:988
+  throw err;
+  ^
+
+Error: Cannot find module 'rbush'
+Require stack:
+- /home/runner/workspace/src/geometry-engine.js
+- /home/runner/workspace/src/dxf-processor.js
+- /home/runner/workspace/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:985:15)
+    at Function.Module._load (node:internal/modules/cjs/loader:833:27)
+    at Module.require (node:internal/modules/cjs/loader:1057:19)
+    at require (node:internal/modules/cjs/helpers:103:18)
+    at Object.<anonymous> (/home/runner/workspace/src/geometry-engine.js:18:15)
+    at Module._compile (node:internal/modules/cjs/loader:1155:14)
+    at Object.Module._extensions..js (node:internal/modules/cjs/loader:1209:10)
+    at Module.load (node:internal/modules/cjs/loader:1033:32)
+    at Function.Module._load (node:internal/modules/cjs/loader:868:12)
+    at Module.require (node:internal/modules/cjs/loader:1057:19) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/runner/workspace/src/geometry-engine.js',
+    '/home/runner/workspace/src/dxf-processor.js',
+    '/home/runner/workspace/server.js'
+  ]
+}
+[nodemon] app crashed - waiting for file changes before starting...
+[nodemon] restarting due to changes...
+[nodemon] starting `node server.js`
+[nodemon] restarting due to changes...
+[nodemon] starting `node server.js`
+[dotenv@17.2.1] injecting env (0) from .env -- tip: ⚙️  write to custom object with { processEnv: myObject }
+🔍 Debug - All environment variables starting with APS or FORGE:
+   No APS or FORGE environment variables found
+🔍 Checking all environment variables for debugging:
+   PGPORT: SET
+   REPL_SLUG: SET
+   DATABASE_URL: SET
+   REPL_IMAGE: SET
+   USER: SET
+   npm_config_user_agent: SET
+   REPL_OWNER: SET
+   REPLIT_DB_URL: SET
+   GIT_EDITOR: SET
+   HOSTNAME: SET
+🔧 Environment Check:
+   NODE_ENV: not set
+   APS_CLIENT_ID: NOT SET
+   APS_CLIENT_SECRET: NOT SET
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!! WARNING: Missing APS_CLIENT_ID or APS_CLIENT_SECRET environment variables.
+!!! CAD file processing features will be disabled until credentials are provided.
+!!! Please add your Autodesk Platform Services credentials using the secrets manager.
+!!! Make sure your APS app has access to: Data Management API, Model Derivative API
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+FloorPlan Pro Backend running on http://0.0.0.0:5000
+🔗 WebSocket server ready for real-time collaboration
+🚀 Starting upload: 20250628_TEST.dwg
+   Step 1: Getting authentication token...
+❌ UPLOAD FAILED:
+   HTTP Status: 403
+   Response data: {
+  "developerMessage": "The client_id specified does not have access to the api product",
+  "moreInfo": "https://aps.autodesk.com/en/docs/oauth/v2/developers_guide/error_handling/",
+  "errorCode": "AUTH-001"
+}
+[nodemon] restarting due to changes...
+[nodemon] starting `node server.js`
+[dotenv@17.2.1] injecting env (0) from .env -- tip: ⚙️  enable debug logging with { debug: true }
+🔍 Debug - All environment variables starting with APS or FORGE:
+   No APS or FORGE environment variables found
+🔍 Checking all environment variables for debugging:
+   PGPORT: SET
+   REPL_SLUG: SET
+   DATABASE_URL: SET
+   REPL_IMAGE: SET
+   USER: SET
+   npm_config_user_agent: SET
+   REPL_OWNER: SET
+   REPLIT_DB_URL: SET
+   GIT_EDITOR: SET
+   HOSTNAME: SET
+🔧 Environment Check:
+   NODE_ENV: not set
+   APS_CLIENT_ID: NOT SET
+   APS_CLIENT_SECRET: NOT SET
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!! WARNING: Missing APS_CLIENT_ID or APS_CLIENT_SECRET environment variables.
+!!! CAD file processing features will be disabled until credentials are provided.
+!!! Please add your Autodesk Platform Services credentials using the secrets manager.
+!!! Make sure your APS app has access to: Data Management API, Model Derivative API
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+FloorPlan Pro Backend running on http://0.0.0.0:5000
+🔗 WebSocket server ready for real-time collaboration
+🚀 Starting upload: 20250628_TEST.dwg
+   Step 1: Getting authentication token...
+❌ UPLOAD FAILED:
+   HTTP Status: 403
+   Response data: {
+  "developerMessage": "The client_id specified does not have access to the api product",
+  "moreInfo": "https://aps.autodesk.com/en/docs/oauth/v2/developers_guide/error_handling/",
+  "errorCode": "AUTH-001"
+}
