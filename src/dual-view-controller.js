@@ -907,18 +907,43 @@ class CanvasViewController {
     }
 
     onMouseDown(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        
         this.isDragging = true;
         this.lastMouse = { x: event.clientX, y: event.clientY };
+        
+        // Get mouse position relative to canvas
+        const rect = this.canvas.getBoundingClientRect();
+        const canvasX = event.clientX - rect.left;
+        const canvasY = event.clientY - rect.top;
+        
+        // Convert to world coordinates for selection
+        const worldX = (canvasX - this.canvas.width / 2) / this.camera.zoom + this.camera.x;
+        const worldY = (canvasY - this.canvas.height / 2) / this.camera.zoom + this.camera.y;
+        
+        // Check for selection at this point
+        const selectedObject = this.getObjectAtPoint([worldX, worldY]);
+        if (selectedObject) {
+            this.selection = [selectedObject.id];
+            this.emit('selectionChanged', this.selection);
+            this.render(); // Re-render to show selection
+        }
     }
 
     onMouseMove(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        
         if (this.isDragging) {
             const dx = event.clientX - this.lastMouse.x;
             const dy = event.clientY - this.lastMouse.y;
             
-            this.camera.x += dx / this.camera.zoom;
-            this.camera.y += dy / this.camera.zoom;
+            // Apply camera movement
+            this.camera.x -= dx / this.camera.zoom;
+            this.camera.y -= dy / this.camera.zoom;
             
+            // Re-render the scene
             this.render();
             this.emit('cameraChanged', this.getCameraState());
         }
@@ -927,17 +952,117 @@ class CanvasViewController {
     }
 
     onMouseUp(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        
         this.isDragging = false;
     }
 
     onWheel(event) {
         event.preventDefault();
+        event.stopPropagation();
+        
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+        
+        // Calculate zoom center in world coordinates
+        const worldX = (mouseX - this.canvas.width / 2) / this.camera.zoom + this.camera.x;
+        const worldY = (mouseY - this.canvas.height / 2) / this.camera.zoom + this.camera.y;
         
         const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
+        const oldZoom = this.camera.zoom;
         this.camera.zoom *= zoomFactor;
+        
+        // Clamp zoom levels
+        this.camera.zoom = Math.max(0.1, Math.min(10, this.camera.zoom));
+        
+        // Adjust camera position to zoom around mouse position
+        const zoomRatio = this.camera.zoom / oldZoom;
+        this.camera.x = worldX - (worldX - this.camera.x) * zoomRatio;
+        this.camera.y = worldY - (worldY - this.camera.y) * zoomRatio;
         
         this.render();
         this.emit('cameraChanged', this.getCameraState());
+    }
+
+    getObjectAtPoint(worldPoint) {
+        try {
+            const geometries = this.parent.sharedScene.getAllGeometries();
+            
+            for (const geometry of geometries) {
+                if (this.isPointInGeometry(worldPoint, geometry)) {
+                    return geometry;
+                }
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('Error getting object at point:', error);
+            return null;
+        }
+    }
+
+    isPointInGeometry(point, geometry) {
+        try {
+            if (geometry.polygon) {
+                return this.pointInPolygon(point, geometry.polygon);
+            }
+            
+            if (geometry.line) {
+                // Check if point is near line
+                const [start, end] = geometry.line;
+                const distToLine = this.pointToLineDistance(point, start, end);
+                const thickness = geometry.thickness || 0.1;
+                return distToLine <= thickness / 2;
+            }
+            
+            return false;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    pointInPolygon(point, polygon) {
+        const [x, y] = point;
+        let inside = false;
+
+        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            const [xi, yi] = polygon[i];
+            const [xj, yj] = polygon[j];
+
+            if (((yi > y) !== (yj > y)) && 
+                (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+                inside = !inside;
+            }
+        }
+
+        return inside;
+    }
+
+    pointToLineDistance(point, lineStart, lineEnd) {
+        const A = point[0] - lineStart[0];
+        const B = point[1] - lineStart[1];
+        const C = lineEnd[0] - lineStart[0];
+        const D = lineEnd[1] - lineStart[1];
+
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+
+        if (lenSq === 0) {
+            return Math.sqrt(A * A + B * B);
+        }
+
+        let param = dot / lenSq;
+        param = Math.max(0, Math.min(1, param));
+
+        const closestX = lineStart[0] + param * C;
+        const closestY = lineStart[1] + param * D;
+
+        const dx = point[0] - closestX;
+        const dy = point[1] - closestY;
+
+        return Math.sqrt(dx * dx + dy * dy);
     }
 
     resize() {
@@ -949,52 +1074,228 @@ class CanvasViewController {
     }
 
     render() {
-        // Clear canvas
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Apply camera transform
-        this.ctx.save();
-        this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
-        this.ctx.scale(this.camera.zoom, this.camera.zoom);
-        this.ctx.translate(-this.camera.x, -this.camera.y);
-        
-        // Render all geometries
-        const geometries = this.parent.sharedScene.getAllGeometries();
-        for (const geometry of geometries) {
-            this.renderGeometry(geometry);
+        try {
+            // Get canvas dimensions
+            const canvasWidth = this.canvas.clientWidth;
+            const canvasHeight = this.canvas.clientHeight;
+            
+            // Update canvas size if needed
+            if (this.canvas.width !== canvasWidth || this.canvas.height !== canvasHeight) {
+                this.canvas.width = canvasWidth;
+                this.canvas.height = canvasHeight;
+            }
+            
+            // Clear canvas with background
+            this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            this.ctx.fillStyle = '#f8fafc';
+            this.ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+            
+            // Apply camera transform
+            this.ctx.save();
+            
+            // Translate to center and apply zoom
+            this.ctx.translate(canvasWidth / 2, canvasHeight / 2);
+            this.ctx.scale(this.camera.zoom, this.camera.zoom);
+            this.ctx.translate(-this.camera.x, -this.camera.y);
+            
+            // Render grid for reference
+            this.renderGrid();
+            
+            // Get and render all geometries
+            const geometries = this.parent.sharedScene.getAllGeometries();
+            
+            if (geometries && geometries.length > 0) {
+                for (const geometry of geometries) {
+                    try {
+                        this.renderGeometry(geometry);
+                    } catch (error) {
+                        console.error('Error rendering geometry:', geometry, error);
+                    }
+                }
+            }
+            
+            // Render selection highlights
+            this.renderSelectionHighlights();
+            
+            this.ctx.restore();
+            
+            // Render UI elements (zoom level, etc.)
+            this.renderUI();
+            
+        } catch (error) {
+            console.error('Canvas render error:', error);
+            
+            // Fallback rendering
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.fillStyle = '#f8fafc';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         }
+    }
+
+    renderGrid() {
+        const gridSize = 1.0; // 1 meter grid
+        const canvasWidth = this.canvas.width / this.camera.zoom;
+        const canvasHeight = this.canvas.height / this.camera.zoom;
+        
+        const startX = Math.floor((this.camera.x - canvasWidth / 2) / gridSize) * gridSize;
+        const endX = Math.ceil((this.camera.x + canvasWidth / 2) / gridSize) * gridSize;
+        const startY = Math.floor((this.camera.y - canvasHeight / 2) / gridSize) * gridSize;
+        const endY = Math.ceil((this.camera.y + canvasHeight / 2) / gridSize) * gridSize;
+        
+        this.ctx.strokeStyle = '#e2e8f0';
+        this.ctx.lineWidth = 0.5 / this.camera.zoom;
+        this.ctx.setLineDash([5 / this.camera.zoom, 5 / this.camera.zoom]);
+        
+        // Vertical lines
+        for (let x = startX; x <= endX; x += gridSize) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, startY);
+            this.ctx.lineTo(x, endY);
+            this.ctx.stroke();
+        }
+        
+        // Horizontal lines
+        for (let y = startY; y <= endY; y += gridSize) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(startX, y);
+            this.ctx.lineTo(endX, y);
+            this.ctx.stroke();
+        }
+        
+        this.ctx.setLineDash([]);
+    }
+
+    renderSelectionHighlights() {
+        if (this.selection.length === 0) return;
+        
+        const geometries = this.parent.sharedScene.getAllGeometries();
+        
+        for (const geometry of geometries) {
+            if (this.selection.includes(geometry.id)) {
+                this.ctx.save();
+                this.ctx.strokeStyle = '#3b82f6';
+                this.ctx.lineWidth = 3 / this.camera.zoom;
+                this.ctx.setLineDash([5 / this.camera.zoom, 5 / this.camera.zoom]);
+                
+                if (geometry.polygon) {
+                    this.renderPolygon(geometry.polygon, false);
+                }
+                
+                this.ctx.restore();
+            }
+        }
+    }
+
+    renderUI() {
+        this.ctx.save();
+        this.ctx.resetTransform();
+        
+        // Render zoom level
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(10, 10, 120, 30);
+        
+        this.ctx.fillStyle = 'white';
+        this.ctx.font = '12px Inter';
+        this.ctx.fillText(`Zoom: ${(this.camera.zoom * 100).toFixed(0)}%`, 20, 30);
+        
+        // Render coordinates
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        this.ctx.fillRect(10, 50, 150, 30);
+        
+        this.ctx.fillStyle = 'white';
+        this.ctx.fillText(`X: ${this.camera.x.toFixed(1)}, Y: ${this.camera.y.toFixed(1)}`, 20, 70);
         
         this.ctx.restore();
     }
 
     renderGeometry(geometry) {
+        if (!geometry) return;
+        
         this.ctx.save();
         
-        const style = geometry.style || {};
-        
-        // Set style properties
-        if (style.color) this.ctx.strokeStyle = style.color;
-        if (style.fill && style.color) this.ctx.fillStyle = style.color;
-        if (style.thickness) this.ctx.lineWidth = style.thickness;
-        if (style.opacity) this.ctx.globalAlpha = style.opacity;
-        
-        // Render based on geometry type
-        switch (geometry.type) {
-            case 'wall':
-                this.renderWall(geometry);
-                break;
-            case 'zone':
-                this.renderZone(geometry);
-                break;
-            case 'ilot':
-                this.renderIlot(geometry);
-                break;
-            case 'corridor':
-                this.renderCorridor(geometry);
-                break;
+        try {
+            const style = geometry.style || {};
+            
+            // Set style properties with fallbacks
+            this.ctx.strokeStyle = style.color || '#6B7280';
+            this.ctx.fillStyle = style.color || '#6B7280';
+            this.ctx.lineWidth = (style.thickness || 1) / this.camera.zoom;
+            this.ctx.globalAlpha = style.opacity !== undefined ? style.opacity : 1.0;
+            
+            // Render based on geometry type
+            switch (geometry.type) {
+                case 'wall':
+                    this.renderWall(geometry);
+                    break;
+                case 'zone':
+                    this.renderZone(geometry);
+                    break;
+                case 'ilot':
+                    this.renderIlot(geometry);
+                    break;
+                case 'corridor':
+                    this.renderCorridor(geometry);
+                    break;
+                default:
+                    // Generic polygon rendering
+                    if (geometry.polygon) {
+                        this.renderPolygon(geometry.polygon, style.fill);
+                    }
+                    break;
+            }
+            
+            // Render labels if present
+            if (geometry.label) {
+                this.renderLabel(geometry);
+            }
+            
+        } catch (error) {
+            console.error('Error in renderGeometry:', error);
         }
         
         this.ctx.restore();
+    }
+
+    renderLabel(geometry) {
+        if (!geometry.label || !geometry.polygon) return;
+        
+        // Calculate center of geometry
+        const center = this.calculatePolygonCenter(geometry.polygon);
+        
+        this.ctx.save();
+        this.ctx.fillStyle = '#1e293b';
+        this.ctx.font = `${12 / this.camera.zoom}px Inter`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        
+        // Add background for better readability
+        const metrics = this.ctx.measureText(geometry.label);
+        const padding = 4 / this.camera.zoom;
+        
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        this.ctx.fillRect(
+            center[0] - metrics.width / 2 - padding,
+            center[1] - 6 / this.camera.zoom - padding,
+            metrics.width + padding * 2,
+            12 / this.camera.zoom + padding * 2
+        );
+        
+        this.ctx.fillStyle = '#1e293b';
+        this.ctx.fillText(geometry.label, center[0], center[1]);
+        
+        this.ctx.restore();
+    }
+
+    calculatePolygonCenter(polygon) {
+        if (!polygon || polygon.length === 0) return [0, 0];
+        
+        let x = 0, y = 0;
+        for (const point of polygon) {
+            x += point[0];
+            y += point[1];
+        }
+        
+        return [x / polygon.length, y / polygon.length];
     }
 
     renderWall(geometry) {

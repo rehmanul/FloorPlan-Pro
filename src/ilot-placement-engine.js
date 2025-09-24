@@ -795,6 +795,12 @@ class IlotPlacementEngine {
         try {
             // Get sorted cells safely
             const sortedCells = this.getSortedPlacementCells();
+            
+            if (!sortedCells || !Array.isArray(sortedCells) || sortedCells.length === 0) {
+                this.log('No valid placement cells available, using fallback placement');
+                await this.executeFallbackPlacement(requirements, config);
+                return;
+            }
 
             for (const cell of sortedCells) {
                 // Check timeout
@@ -1208,6 +1214,377 @@ class IlotPlacementEngine {
             return this.hasIlotClearance(position);
         } catch (error) {
             return false;
+        }
+    }
+
+    /**
+     * PLACEMENT GRID UTILITIES
+     */
+
+    getSortedPlacementCells() {
+        try {
+            if (!this.placementGrid || !this.placementGrid.scores || !this.placementGrid.cells) {
+                this.log('Warning: No valid placement grid available');
+                return [];
+            }
+
+            const cells = [];
+            const { width, height, scores } = this.placementGrid;
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const index = y * width + x;
+                    if (index < scores.length && scores[index] > 0) {
+                        cells.push({
+                            x: x,
+                            y: y,
+                            score: scores[index],
+                            index: index
+                        });
+                    }
+                }
+            }
+
+            // Sort by score (highest first)
+            cells.sort((a, b) => b.score - a.score);
+
+            this.log('Sorted placement cells', { totalCells: cells.length });
+            return cells;
+
+        } catch (error) {
+            this.logError('Failed to get sorted placement cells', error);
+            return [];
+        }
+    }
+
+    gridToWorld(gridX, gridY) {
+        try {
+            if (!this.placementGrid || !this.placementGrid.bbox) {
+                return [0, 0];
+            }
+
+            const { bbox, resolution } = this.placementGrid;
+            const worldX = bbox.minX + (gridX + 0.5) * resolution;
+            const worldY = bbox.minY + (gridY + 0.5) * resolution;
+
+            return [worldX, worldY];
+        } catch (error) {
+            this.logError('Grid to world conversion failed', error);
+            return [0, 0];
+        }
+    }
+
+    indexPlacedIlot(ilot) {
+        try {
+            if (!ilot || !ilot.position) {
+                return;
+            }
+
+            const bbox = {
+                minX: ilot.position.x - ilot.dimensions.width / 2,
+                minY: ilot.position.y - ilot.dimensions.height / 2,
+                maxX: ilot.position.x + ilot.dimensions.width / 2,
+                maxY: ilot.position.y + ilot.dimensions.height / 2
+            };
+
+            if (this.isValidBBox(bbox)) {
+                this.spatialIndex.insert({ ...bbox, ilot });
+            }
+
+        } catch (error) {
+            this.logError('Failed to index placed îlot', error);
+        }
+    }
+
+    calculateUsableArea() {
+        try {
+            if (!this.floorPlan || !this.floorPlan.bounds) {
+                return 300; // Default fallback area
+            }
+
+            const bounds = this.floorPlan.bounds;
+            const totalArea = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY);
+            
+            // Assume 70% is usable (30% for walls, corridors, etc.)
+            return totalArea * 0.7;
+
+        } catch (error) {
+            this.logError('Failed to calculate usable area', error);
+            return 300;
+        }
+    }
+
+    determineIlotTypes(config) {
+        try {
+            const defaultTypes = ['workspace', 'meeting', 'social'];
+            
+            if (config && config.ilotTypes && Array.isArray(config.ilotTypes)) {
+                return config.ilotTypes.filter(type => typeof type === 'string');
+            }
+
+            return defaultTypes;
+        } catch (error) {
+            return ['workspace'];
+        }
+    }
+
+    resetPlacementStats() {
+        this.placementStats = this.createDefaultStats();
+    }
+
+    createBoundaryFromBounds() {
+        try {
+            if (!this.floorPlan || !this.floorPlan.bounds) {
+                return this.createDefaultBoundary();
+            }
+
+            const bounds = this.floorPlan.bounds;
+            return [
+                [bounds.minX, bounds.minY],
+                [bounds.maxX, bounds.minY],
+                [bounds.maxX, bounds.maxY],
+                [bounds.minX, bounds.maxY]
+            ];
+        } catch (error) {
+            return this.createDefaultBoundary();
+        }
+    }
+
+    createDefaultBoundary() {
+        return [
+            [0, 0],
+            [20, 0],
+            [20, 15],
+            [0, 15]
+        ];
+    }
+
+    calculateBoundingBoxFromBoundary(boundary) {
+        try {
+            if (!Array.isArray(boundary) || boundary.length === 0) {
+                return { minX: 0, minY: 0, maxX: 20, maxY: 15 };
+            }
+
+            let minX = Infinity, minY = Infinity;
+            let maxX = -Infinity, maxY = -Infinity;
+
+            for (const point of boundary) {
+                if (Array.isArray(point) && point.length >= 2) {
+                    const x = Number(point[0]);
+                    const y = Number(point[1]);
+                    if (!isNaN(x) && !isNaN(y)) {
+                        minX = Math.min(minX, x);
+                        maxX = Math.max(maxX, x);
+                        minY = Math.min(minY, y);
+                        maxY = Math.max(maxY, y);
+                    }
+                }
+            }
+
+            if (!isFinite(minX) || !isFinite(maxX) || !isFinite(minY) || !isFinite(maxY)) {
+                return { minX: 0, minY: 0, maxX: 20, maxY: 15 };
+            }
+
+            return { minX, minY, maxX, maxY };
+        } catch (error) {
+            return { minX: 0, minY: 0, maxX: 20, maxY: 15 };
+        }
+    }
+
+    hasIlotClearance(position) {
+        try {
+            if (!this.isValidPoint(position)) {
+                return false;
+            }
+
+            // Simple clearance check - can be enhanced with actual spatial queries
+            return true; // For now, assume all positions have clearance
+        } catch (error) {
+            return false;
+        }
+    }
+
+    createWallPolygon(wall) {
+        try {
+            // Convert wall line to polygon with thickness
+            const thickness = wall.thickness || 0.2;
+            const start = wall.start || [wall.x1, wall.y1];
+            const end = wall.end || [wall.x2, wall.y2];
+
+            if (!start || !end) {
+                return [[0, 0], [0.2, 0], [0.2, 0.2], [0, 0.2]];
+            }
+
+            // Create a simple rectangular polygon for the wall
+            const dx = end[0] - start[0];
+            const dy = end[1] - start[1];
+            const length = Math.sqrt(dx * dx + dy * dy);
+
+            if (length === 0) {
+                return [[start[0], start[1]], [start[0] + thickness, start[1]], 
+                       [start[0] + thickness, start[1] + thickness], [start[0], start[1] + thickness]];
+            }
+
+            const unitX = dx / length;
+            const unitY = dy / length;
+            const perpX = -unitY * thickness / 2;
+            const perpY = unitX * thickness / 2;
+
+            return [
+                [start[0] + perpX, start[1] + perpY],
+                [end[0] + perpX, end[1] + perpY],
+                [end[0] - perpX, end[1] - perpY],
+                [start[0] - perpX, start[1] - perpY]
+            ];
+
+        } catch (error) {
+            return [[0, 0], [0.2, 0], [0.2, 0.2], [0, 0.2]];
+        }
+    }
+
+    createDoorClearanceZone(door) {
+        try {
+            const clearance = this.config.minDoorClearance;
+            const position = door.position || [door.x || 0, door.y || 0];
+            const width = door.width || 0.8;
+
+            return [
+                [position[0] - clearance, position[1] - clearance],
+                [position[0] + width + clearance, position[1] - clearance],
+                [position[0] + width + clearance, position[1] + clearance],
+                [position[0] - clearance, position[1] + clearance]
+            ];
+        } catch (error) {
+            return [[0, 0], [2, 0], [2, 2], [0, 2]];
+        }
+    }
+
+    createWindowClearanceZone(opening) {
+        try {
+            const clearance = 0.5; // Smaller clearance for windows
+            const position = opening.position || [opening.x || 0, opening.y || 0];
+            const width = opening.width || 1.0;
+
+            return [
+                [position[0] - clearance, position[1] - clearance],
+                [position[0] + width + clearance, position[1] - clearance],
+                [position[0] + width + clearance, position[1] + clearance],
+                [position[0] - clearance, position[1] + clearance]
+            ];
+        } catch (error) {
+            return [[0, 0], [1.5, 0], [1.5, 1], [0, 1]];
+        }
+    }
+
+    async optimizePlacement() {
+        try {
+            this.log('Starting placement optimization');
+            
+            // Simple optimization - remove overlapping îlots
+            const optimizedIlots = [];
+            
+            for (const ilot of this.placedIlots) {
+                let hasOverlap = false;
+                
+                for (const existing of optimizedIlots) {
+                    if (this.ilotsOverlap(ilot, existing)) {
+                        hasOverlap = true;
+                        break;
+                    }
+                }
+                
+                if (!hasOverlap) {
+                    optimizedIlots.push(ilot);
+                }
+            }
+            
+            this.placedIlots = optimizedIlots;
+            this.placementStats.optimizationIterations = 1;
+            
+            this.log('Placement optimization completed', { iterations: 1 });
+            
+        } catch (error) {
+            this.logError('Placement optimization failed', error);
+        }
+    }
+
+    ilotsOverlap(ilot1, ilot2) {
+        try {
+            const rect1 = {
+                minX: ilot1.x,
+                minY: ilot1.y,
+                maxX: ilot1.x + ilot1.width,
+                maxY: ilot1.y + ilot1.height
+            };
+
+            const rect2 = {
+                minX: ilot2.x,
+                minY: ilot2.y,
+                maxX: ilot2.x + ilot2.width,
+                maxY: ilot2.y + ilot2.height
+            };
+
+            return !(rect1.maxX < rect2.minX || rect2.maxX < rect1.minX ||
+                     rect1.maxY < rect2.minY || rect2.maxY < rect1.minY);
+        } catch (error) {
+            return false;
+        }
+    }
+
+    async validatePlacement() {
+        try {
+            const issues = [];
+            
+            for (const ilot of this.placedIlots) {
+                if (!ilot.isValid) {
+                    issues.push(`Îlot ${ilot.id} is marked as invalid`);
+                }
+                
+                if (ilot.clearance < this.getMinClearanceFromConfig()) {
+                    issues.push(`Îlot ${ilot.id} has insufficient clearance: ${ilot.clearance}m`);
+                }
+            }
+            
+            return {
+                isValid: issues.length === 0,
+                errors: issues,
+                totalIlots: this.placedIlots.length,
+                validIlots: this.placedIlots.filter(i => i.isValid).length
+            };
+            
+        } catch (error) {
+            this.logError('Placement validation failed', error);
+            return {
+                isValid: false,
+                errors: ['Validation process failed'],
+                totalIlots: 0,
+                validIlots: 0
+            };
+        }
+    }
+
+    getStatistics() {
+        return {
+            ...this.placementStats,
+            config: this.config,
+            placedIlots: this.placedIlots.length,
+            gridSize: this.placementGrid ? this.placementGrid.width * this.placementGrid.height : 0,
+            spatialEfficiency: this.calculateSpatialEfficiency()
+        };
+    }
+
+    calculateSpatialEfficiency() {
+        try {
+            if (this.placedIlots.length === 0) return 0;
+            
+            const totalIlotArea = this.placedIlots.reduce((sum, ilot) => 
+                sum + (ilot.width * ilot.height), 0);
+            
+            const usableArea = this.calculateUsableArea();
+            return totalIlotArea / usableArea;
+            
+        } catch (error) {
+            return 0;
         }
     }
 
