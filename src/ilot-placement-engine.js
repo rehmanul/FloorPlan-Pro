@@ -321,7 +321,7 @@ class IlotPlacementEngine {
         await this.safeExecute('createPlacementGrid', []);
 
         // Step 3: Calculate îlot requirements
-        const ilotRequirements = this.safeExecute('calculateIlotRequirements', [placementConfig]);
+        const ilotRequirements = await this.safeExecute('calculateIlotRequirements', [placementConfig]);
 
         // Step 4: Execute placement strategy
         await this.safeExecute('executePlacementStrategy', [ilotRequirements, placementConfig]);
@@ -341,7 +341,9 @@ class IlotPlacementEngine {
     async safeExecute(methodName, args = []) {
         try {
             if (typeof this[methodName] === 'function') {
-                return await this[methodName](...args);
+                const result = this[methodName](...args);
+                // Handle both sync and async methods
+                return result instanceof Promise ? await result : result;
             } else {
                 this.logError(`Method ${methodName} not found`);
                 return null;
@@ -793,6 +795,18 @@ class IlotPlacementEngine {
         let placedCount = 0;
 
         try {
+            // Validate requirements object
+            if (!requirements || !requirements.ilotTypes || !Array.isArray(requirements.ilotTypes)) {
+                this.log('Invalid requirements, using fallback placement');
+                await this.executeFallbackPlacement({ 
+                    totalIlots: 5, 
+                    ilotTypes: ['workspace'], 
+                    sizingStrategy: 'uniform', 
+                    densityTarget: 0.3 
+                }, config);
+                return;
+            }
+
             // Get sorted cells safely
             const sortedCells = this.getSortedPlacementCells();
             
@@ -835,15 +849,25 @@ class IlotPlacementEngine {
 
     async executeFallbackPlacement(requirements, config) {
         try {
+            // Ensure we have valid requirements
+            const safeRequirements = requirements || { 
+                totalIlots: 5, 
+                ilotTypes: ['workspace'], 
+                sizingStrategy: 'uniform', 
+                densityTarget: 0.3 
+            };
+            
             // Simple grid-based fallback placement
             const boundary = this.floorPlan.boundary || this.createBoundaryFromBounds();
             const bbox = this.calculateBoundingBoxFromBoundary(boundary);
 
             let placedCount = 0;
-            const spacing = config.defaultIlotSize.width + config.minIlotDistance;
+            const spacing = (config.defaultIlotSize?.width || 3.0) + (config.minIlotDistance || 2.0);
 
-            for (let x = bbox.minX + spacing / 2; x < bbox.maxX - spacing / 2 && placedCount < 5; x += spacing) {
-                for (let y = bbox.minY + spacing / 2; y < bbox.maxY - spacing / 2 && placedCount < 5; y += spacing) {
+            const maxIlots = Math.min(safeRequirements.totalIlots || 5, 10); // Cap at 10 for fallback
+            
+            for (let x = bbox.minX + spacing / 2; x < bbox.maxX - spacing / 2 && placedCount < maxIlots; x += spacing) {
+                for (let y = bbox.minY + spacing / 2; y < bbox.maxY - spacing / 2 && placedCount < maxIlots; y += spacing) {
                     const worldPos = [x, y];
                     const ilotType = 'workspace';
 
