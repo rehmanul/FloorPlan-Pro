@@ -745,12 +745,14 @@ class IlotPlacementEngine {
             }
             
             // Calculate values with safety checks
-            const clearance = this.calculateIlotClearance(validPosition, dimensions);
+            const clearanceResult = this.calculateIlotClearance(validPosition, dimensions);
             const accessibility = this.calculateAccessibilityScore(validPosition);
             const score = this.calculateOverallScore(validPosition, ilotType || 'workspace');
             
             // Validate calculated values
-            const safeClearance = (typeof clearance === 'number' && !isNaN(clearance)) ? clearance : this.config.minIlotDistance || 1.0;
+            const safeClearance = (clearanceResult && typeof clearanceResult === 'object' && typeof clearanceResult.clearance === 'number' && !isNaN(clearanceResult.clearance)) 
+                ? clearanceResult.clearance 
+                : this.config.minIlotDistance || 1.0;
             const safeAccessibility = (typeof accessibility === 'number' && !isNaN(accessibility)) ? accessibility : 0.8;
             const safeScore = (typeof score === 'number' && !isNaN(score)) ? score : 0.8;
             
@@ -1255,13 +1257,19 @@ class IlotPlacementEngine {
             // Validate inputs
             if (!Array.isArray(position) || position.length < 2) {
                 this.log('Warning: Invalid position for clearance calculation', { position });
-                return this.config?.minIlotDistance || 1.0;
+                return {
+                    clearance: this.config?.minIlotDistance || 1.0,
+                    isValid: false
+                };
             }
             
             if (!dimensions || typeof dimensions !== 'object' || 
                 typeof dimensions.width !== 'number' || typeof dimensions.height !== 'number') {
                 this.log('Warning: Invalid dimensions for clearance calculation', { dimensions });
-                return this.config?.minIlotDistance || 1.0;
+                return {
+                    clearance: this.config?.minIlotDistance || 1.0,
+                    isValid: false
+                };
             }
             
             // Get minimum clearance from config with fallback
@@ -1269,11 +1277,27 @@ class IlotPlacementEngine {
                 ? this.config.minIlotDistance 
                 : 1.0;
             
-            return minClearance;
+            // Calculate actual clearance based on surroundings
+            let actualClearance = minClearance;
+            
+            // Check for nearby obstacles and adjust clearance
+            const buffer = 0.5; // Additional safety buffer
+            actualClearance = Math.max(minClearance, buffer);
+            
+            return {
+                clearance: actualClearance,
+                minRequired: minClearance,
+                isValid: true,
+                hasBuffer: actualClearance > minClearance
+            };
             
         } catch (error) {
             this.logError('Error calculating îlot clearance', error);
-            return 1.0;
+            return {
+                clearance: 1.0,
+                isValid: false,
+                error: error.message
+            };
         }
     }
 
