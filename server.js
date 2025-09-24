@@ -409,17 +409,17 @@ app.post('/api/advanced-placement', async (req, res) => {
         // Format results for frontend
         const formattedIlots = placedIlots.map(ilot => ({
             id: ilot.id,
-            x: ilot.position.x - ilot.dimensions.width / 2,
-            y: ilot.position.y - ilot.dimensions.height / 2,
-            width: ilot.dimensions.width,
-            height: ilot.dimensions.height,
-            type: ilot.type,
-            capacity: ilot.properties.capacity,
-            equipment: ilot.properties.equipment,
-            isValid: ilot.validation.isValid,
-            clearance: ilot.validation.clearance,
-            accessibility: ilot.validation.accessibility,
-            score: ilot.metadata.placementScore
+            x: ilot.x || (ilot.position ? ilot.position.x - (ilot.dimensions ? ilot.dimensions.width / 2 : 1.5) : 0),
+            y: ilot.y || (ilot.position ? ilot.position.y - (ilot.dimensions ? ilot.dimensions.height / 2 : 1) : 0),
+            width: ilot.width || (ilot.dimensions ? ilot.dimensions.width : 3.0),
+            height: ilot.height || (ilot.dimensions ? ilot.dimensions.height : 2.0),
+            type: ilot.type || 'workspace',
+            capacity: ilot.capacity || (ilot.properties ? ilot.properties.capacity : 4),
+            equipment: ilot.equipment || (ilot.properties ? ilot.properties.equipment : ['desks', 'chairs']),
+            isValid: ilot.isValid !== undefined ? ilot.isValid : (ilot.validation ? ilot.validation.isValid : true),
+            clearance: ilot.clearance || (ilot.validation ? ilot.validation.clearance : 1.0),
+            accessibility: ilot.accessibility || (ilot.validation ? ilot.validation.accessibility : 0.8),
+            score: ilot.score || (ilot.metadata ? ilot.metadata.placementScore : 0.8)
         }));
         
         console.log(`✅ Advanced placement completed: ${formattedIlots.length} îlots placed`);
@@ -472,6 +472,16 @@ function generateSimpleGridPlacement(floorPlan, options) {
             ilots.push({
                 id: `fallback_ilot_${count + 1}`,
                 type: 'workspace',
+                x: x - ilotWidth / 2,
+                y: y - ilotHeight / 2,
+                width: ilotWidth,
+                height: ilotHeight,
+                capacity: 4,
+                equipment: ['desks', 'chairs'],
+                isValid: true,
+                clearance: spacing/2,
+                accessibility: 0.8,
+                score: 0.8,
                 position: { x: x, y: y, z: 0 },
                 dimensions: { width: ilotWidth, height: ilotHeight },
                 properties: { capacity: 4, equipment: ['desks', 'chairs'], type: 'workspace' },

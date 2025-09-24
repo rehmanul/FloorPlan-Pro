@@ -717,10 +717,23 @@ class IlotPlacementEngine {
                 return null;
             }
             
+            // Generate properties first
+            const properties = this.generateIlotProperties(ilotType || 'workspace');
+            
             // Create îlot object with safe coordinate access
             const ilot = {
                 id: `ilot_${this.placedIlots.length + 1}`,
                 type: ilotType || 'workspace',
+                x: x - dimensions.width / 2,  // Top-left x for frontend
+                y: y - dimensions.height / 2, // Top-left y for frontend
+                width: dimensions.width,
+                height: dimensions.height,
+                capacity: properties.capacity,
+                equipment: properties.equipment,
+                isValid: true,
+                clearance: this.calculateIlotClearance(validPosition, dimensions),
+                accessibility: this.calculateAccessibilityScore(validPosition),
+                score: this.calculateOverallScore(validPosition, ilotType || 'workspace'),
                 position: {
                     x: x,
                     y: y,
@@ -731,7 +744,7 @@ class IlotPlacementEngine {
                     height: dimensions.height
                 },
                 polygon: this.createRectanglePolygon(x, y, dimensions.width, dimensions.height),
-                properties: this.generateIlotProperties(ilotType || 'workspace'),
+                properties: properties,
                 validation: {
                     isValid: true,
                     clearance: this.calculateIlotClearance(validPosition, dimensions),
@@ -873,9 +886,13 @@ class IlotPlacementEngine {
         
         const multiplier = typeMultipliers[ilotType] || 1.0;
         
+        // Use config or fallback to this.config or defaults
+        const configToUse = config || this.config || {};
+        const defaultSize = configToUse.defaultIlotSize || { width: 3.0, height: 2.0 };
+        
         return {
-            width: config.defaultIlotSize.width * multiplier,
-            height: config.defaultIlotSize.height * multiplier
+            width: defaultSize.width * multiplier,
+            height: defaultSize.height * multiplier
         };
     }
 
@@ -1083,22 +1100,36 @@ class IlotPlacementEngine {
     }
 
     gridToWorld(gridX, gridY) {
-        if (!this.placementGrid || !this.placementGrid.bbox) {
-            this.log('Warning: No placement grid available for grid to world conversion');
+        try {
+            if (!this.placementGrid || !this.placementGrid.bbox) {
+                this.log('Warning: No placement grid available for grid to world conversion');
+                return [0, 0];
+            }
+            
+            const bbox = this.placementGrid.bbox;
+            const resolution = this.placementGrid.resolution || 0.5;
+            
+            // Ensure grid coordinates are valid numbers
+            const safeGridX = Number(gridX) || 0;
+            const safeGridY = Number(gridY) || 0;
+            
+            const worldX = (bbox.minX || 0) + (safeGridX + 0.5) * resolution;
+            const worldY = (bbox.minY || 0) + (safeGridY + 0.5) * resolution;
+            
+            // Validate the resulting coordinates
+            if (isNaN(worldX) || isNaN(worldY)) {
+                this.log('Warning: NaN coordinates generated in gridToWorld', { 
+                    gridX, gridY, bbox, resolution, worldX, worldY 
+                });
+                return [0, 0];
+            }
+            
+            return [worldX, worldY];
+            
+        } catch (error) {
+            this.logError('gridToWorld conversion failed', error);
             return [0, 0];
         }
-        
-        const bbox = this.placementGrid.bbox;
-        const resolution = this.placementGrid.resolution || 0.5;
-        
-        // Ensure grid coordinates are valid numbers
-        const safeGridX = Number(gridX) || 0;
-        const safeGridY = Number(gridY) || 0;
-        
-        return [
-            (bbox.minX || 0) + (safeGridX + 0.5) * resolution,
-            (bbox.minY || 0) + (safeGridY + 0.5) * resolution
-        ];
     }
 
     indexPlacedIlot(ilot) {

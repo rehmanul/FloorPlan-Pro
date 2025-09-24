@@ -2366,13 +2366,13 @@
                 if (result.success) {
                     generatedIlots = result.ilots.map(ilot => ({
                         id: ilot.id,
-                        x: ilot.position.x,
-                        y: ilot.position.y,
-                        width: ilot.dimensions.width,
-                        height: ilot.dimensions.height,
-                        type: ilot.properties.type || 'workspace',
-                        capacity: ilot.properties.capacity || 4,
-                        isValid: ilot.validation.isValid,
+                        x: ilot.x || 0,
+                        y: ilot.y || 0,
+                        width: ilot.width || 3.0,
+                        height: ilot.height || 2.0,
+                        type: ilot.type || 'workspace',
+                        capacity: ilot.capacity || 4,
+                        isValid: ilot.isValid !== undefined ? ilot.isValid : true,
                         clearance: ilot.validation.clearance
                     }));
 
