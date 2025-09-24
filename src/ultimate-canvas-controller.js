@@ -21,7 +21,7 @@ class UltimateCanvasController {
             desynchronized: true,
             preserveDrawingBuffer: true  // CRITICAL: Preserve canvas content
         });
-        
+
         // Enhanced state management
         this.state = {
             initialized: false,
@@ -30,7 +30,7 @@ class UltimateCanvasController {
             frameCount: 0,
             needsRedraw: true
         };
-        
+
         // Camera with constraints
         this.camera = {
             x: 0,
@@ -40,7 +40,7 @@ class UltimateCanvasController {
             maxZoom: 20,
             rotation: 0
         };
-        
+
         // Interaction state
         this.interaction = {
             isDragging: false,
@@ -49,7 +49,7 @@ class UltimateCanvasController {
             lastPos: { x: 0, y: 0 },
             button: -1
         };
-        
+
         // Rendering configuration
         this.renderConfig = {
             gridEnabled: true,
@@ -58,7 +58,7 @@ class UltimateCanvasController {
             antialiasing: true,
             maxFPS: 60
         };
-        
+
         // Debug information
         this.debug = {
             geometryCount: 0,
@@ -66,9 +66,9 @@ class UltimateCanvasController {
             lastError: null,
             interactions: 0
         };
-        
+
         this.eventListeners = new Map();
-        
+
         // Initialize immediately
         this.initialize();
     }
@@ -76,23 +76,23 @@ class UltimateCanvasController {
     async initialize() {
         try {
             console.log('[UltimateCanvasController] Initializing...');
-            
+
             // Setup canvas with proper sizing
             this.setupCanvas();
-            
+
             // Setup event handlers
             this.setupEventHandlers();
-            
+
             // Setup resize observer for better responsiveness
             this.setupResizeObserver();
-            
+
             // Initial render
             this.scheduleRender();
-            
+
             this.state.initialized = true;
-            
+
             console.log('[UltimateCanvasController] Initialized successfully');
-            
+
         } catch (error) {
             console.error('[UltimateCanvasController] Initialization failed:', error);
             this.debug.lastError = error;
@@ -103,23 +103,23 @@ class UltimateCanvasController {
         // Get actual canvas dimensions
         const rect = this.canvas.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
-        
+
         // Set actual size in memory (scaled for high DPI)
         this.canvas.width = rect.width * dpr;
         this.canvas.height = rect.height * dpr;
-        
+
         // Set display size (CSS)
         this.canvas.style.width = rect.width + 'px';
         this.canvas.style.height = rect.height + 'px';
-        
+
         // Scale context to handle high DPI
         this.ctx.scale(dpr, dpr);
-        
+
         // Set initial canvas properties
         this.ctx.imageSmoothingEnabled = this.renderConfig.antialiasing;
         this.ctx.lineCap = 'round';
         this.ctx.lineJoin = 'round';
-        
+
         console.log('[UltimateCanvasController] Canvas setup:', {
             displaySize: `${rect.width}x${rect.height}`,
             actualSize: `${this.canvas.width}x${this.canvas.height}`,
@@ -134,23 +134,23 @@ class UltimateCanvasController {
         this.canvas.addEventListener('mouseup', this.onMouseUp.bind(this), { passive: false });
         this.canvas.addEventListener('wheel', this.onWheel.bind(this), { passive: false });
         this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-        
+
         // Touch events for mobile
         this.canvas.addEventListener('touchstart', this.onTouchStart.bind(this), { passive: false });
         this.canvas.addEventListener('touchmove', this.onTouchMove.bind(this), { passive: false });
         this.canvas.addEventListener('touchend', this.onTouchEnd.bind(this), { passive: false });
-        
+
         // Keyboard events
         this.canvas.setAttribute('tabindex', '0');
         this.canvas.addEventListener('keydown', this.onKeyDown.bind(this));
-        
+
         // Visibility changes
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) {
                 this.scheduleRender();
             }
         });
-        
+
         console.log('[UltimateCanvasController] Event handlers setup complete');
     }
 
@@ -171,7 +171,7 @@ class UltimateCanvasController {
         if (this.resizeTimeout) {
             clearTimeout(this.resizeTimeout);
         }
-        
+
         this.resizeTimeout = setTimeout(() => {
             this.setupCanvas();
             this.scheduleRender();
@@ -182,9 +182,9 @@ class UltimateCanvasController {
 
     onMouseDown(event) {
         event.preventDefault();
-        
+
         const pos = this.getEventPosition(event);
-        
+
         this.interaction = {
             isDragging: true,
             isPanning: event.button === 0, // Left button
@@ -192,66 +192,66 @@ class UltimateCanvasController {
             lastPos: pos,
             button: event.button
         };
-        
+
         this.canvas.style.cursor = 'grabbing';
         this.debug.interactions++;
-        
+
         console.log('[UltimateCanvasController] Mouse down:', pos);
     }
 
     onMouseMove(event) {
         event.preventDefault();
-        
+
         const pos = this.getEventPosition(event);
-        
+
         if (this.interaction.isDragging && this.interaction.isPanning) {
             const dx = pos.x - this.interaction.lastPos.x;
             const dy = pos.y - this.interaction.lastPos.y;
-            
+
             // Apply pan with proper scaling
             this.camera.x -= dx / this.camera.zoom;
             this.camera.y -= dy / this.camera.zoom;
-            
+
             this.scheduleRender();
             this.emit('cameraChanged', this.getCameraState());
         }
-        
+
         this.interaction.lastPos = pos;
     }
 
     onMouseUp(event) {
         event.preventDefault();
-        
+
         this.interaction.isDragging = false;
         this.interaction.isPanning = false;
         this.canvas.style.cursor = 'default';
-        
+
         console.log('[UltimateCanvasController] Mouse up');
     }
 
     onWheel(event) {
         event.preventDefault();
-        
+
         const pos = this.getEventPosition(event);
         const worldPos = this.screenToWorld(pos.x, pos.y);
-        
+
         // Calculate zoom
         const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
         const newZoom = Math.max(this.camera.minZoom, 
                        Math.min(this.camera.maxZoom, this.camera.zoom * zoomFactor));
-        
+
         if (newZoom !== this.camera.zoom) {
             this.camera.zoom = newZoom;
-            
+
             // Keep world position under mouse constant
             const newWorldPos = this.screenToWorld(pos.x, pos.y);
             this.camera.x += worldPos[0] - newWorldPos[0];
             this.camera.y += worldPos[1] - newWorldPos[1];
-            
+
             this.scheduleRender();
             this.emit('cameraChanged', this.getCameraState());
         }
-        
+
         console.log('[UltimateCanvasController] Wheel:', { 
             zoom: this.camera.zoom.toFixed(2),
             pos: worldPos
@@ -312,7 +312,7 @@ class UltimateCanvasController {
 
     scheduleRender() {
         if (this.state.needsRedraw) return;
-        
+
         this.state.needsRedraw = true;
         requestAnimationFrame(() => this.render());
     }
@@ -320,36 +320,36 @@ class UltimateCanvasController {
     render() {
         if (!this.state.initialized) return;
         if (this.state.rendering) return;
-        
+
         this.state.rendering = true;
         this.state.needsRedraw = false;
-        
+
         const startTime = performance.now();
-        
+
         try {
             // Clear entire canvas
             this.clearCanvas();
-            
+
             // Save context state
             this.ctx.save();
-            
+
             // Apply camera transformation
             this.applyCamera();
-            
+
             // Render content in layers
             this.renderContent();
-            
+
             // Restore context state
             this.ctx.restore();
-            
+
             // Render UI elements (not affected by camera)
             this.renderUI();
-            
+
             // Update statistics
             this.updateRenderStats(startTime);
-            
+
             this.emit('renderComplete');
-            
+
         } catch (error) {
             console.error('[UltimateCanvasController] Render failed:', error);
             this.debug.lastError = error;
@@ -360,29 +360,29 @@ class UltimateCanvasController {
 
     clearCanvas() {
         const rect = this.canvas.getBoundingClientRect();
-        
+
         // Clear with background color
         this.ctx.fillStyle = '#f8fafc';
         this.ctx.fillRect(0, 0, rect.width, rect.height);
-        
+
         // Alternative: transparent clear
         // this.ctx.clearRect(0, 0, rect.width, rect.height);
     }
 
     applyCamera() {
         const rect = this.canvas.getBoundingClientRect();
-        
+
         // Move to center
         this.ctx.translate(rect.width / 2, rect.height / 2);
-        
+
         // Apply zoom
         this.ctx.scale(this.camera.zoom, this.camera.zoom);
-        
+
         // Apply rotation if needed
         if (this.camera.rotation !== 0) {
             this.ctx.rotate(this.camera.rotation);
         }
-        
+
         // Apply camera position (pan)
         this.ctx.translate(-this.camera.x, -this.camera.y);
     }
@@ -393,19 +393,19 @@ class UltimateCanvasController {
             if (this.renderConfig.gridEnabled) {
                 this.renderGrid();
             }
-            
+
             // Get geometries from parent
             const geometries = this.parent?.sharedScene?.getAllGeometries() || [];
             this.debug.geometryCount = geometries.length;
-            
+
             if (geometries.length === 0) {
                 this.renderNoContentMessage();
                 return;
             }
-            
+
             // Render geometries by type/layer
             this.renderGeometriesByLayer(geometries);
-            
+
         } catch (error) {
             console.error('[UltimateCanvasController] Content render failed:', error);
             this.renderErrorMessage(error);
@@ -415,32 +415,32 @@ class UltimateCanvasController {
     renderGrid() {
         const bounds = this.getVisibleBounds();
         const spacing = this.renderConfig.gridSpacing;
-        
+
         this.ctx.save();
         this.ctx.strokeStyle = '#e2e8f0';
         this.ctx.lineWidth = 1 / this.camera.zoom;
         this.ctx.globalAlpha = 0.5;
-        
+
         this.ctx.beginPath();
-        
+
         // Vertical lines
         const startX = Math.floor(bounds.minX / spacing) * spacing;
         const endX = Math.ceil(bounds.maxX / spacing) * spacing;
-        
+
         for (let x = startX; x <= endX; x += spacing) {
             this.ctx.moveTo(x, bounds.minY);
             this.ctx.lineTo(x, bounds.maxY);
         }
-        
+
         // Horizontal lines
         const startY = Math.floor(bounds.minY / spacing) * spacing;
         const endY = Math.ceil(bounds.maxY / spacing) * spacing;
-        
+
         for (let y = startY; y <= endY; y += spacing) {
             this.ctx.moveTo(bounds.minX, y);
             this.ctx.lineTo(bounds.maxX, y);
         }
-        
+
         this.ctx.stroke();
         this.ctx.restore();
     }
@@ -448,7 +448,7 @@ class UltimateCanvasController {
     renderGeometriesByLayer(geometries) {
         // Group by layer
         const layers = new Map();
-        
+
         for (const geom of geometries) {
             const layer = geom.metadata?.layer || 'DEFAULT';
             if (!layers.has(layer)) {
@@ -456,16 +456,16 @@ class UltimateCanvasController {
             }
             layers.get(layer).push(geom);
         }
-        
+
         // Render in order
         const layerOrder = ['WALLS', 'RED_ZONE', 'BLUE_ZONE', 'CORRIDORS', 'ILOTS', 'ANNOTATIONS'];
-        
+
         for (const layerName of layerOrder) {
             if (layers.has(layerName)) {
                 this.renderLayer(layers.get(layerName), layerName);
             }
         }
-        
+
         // Render any remaining layers
         for (const [layerName, geometries] of layers) {
             if (!layerOrder.includes(layerName)) {
@@ -476,25 +476,25 @@ class UltimateCanvasController {
 
     renderLayer(geometries, layerName) {
         this.ctx.save();
-        
+
         for (const geometry of geometries) {
             if (this.isGeometryVisible(geometry)) {
                 this.renderGeometry(geometry);
             }
         }
-        
+
         this.ctx.restore();
     }
 
     renderGeometry(geometry) {
         this.ctx.save();
-        
+
         try {
             const style = geometry.style || {};
-            
+
             // Apply style
             this.applyStyle(style);
-            
+
             // Render based on type
             switch (geometry.type) {
                 case 'wall':
@@ -513,11 +513,11 @@ class UltimateCanvasController {
                     this.renderGeneric(geometry);
                     break;
             }
-            
+
         } catch (error) {
             console.warn('[UltimateCanvasController] Failed to render geometry:', geometry.id, error);
         }
-        
+
         this.ctx.restore();
     }
 
@@ -528,15 +528,15 @@ class UltimateCanvasController {
                 this.ctx.fillStyle = style.color;
             }
         }
-        
+
         if (style.strokeColor) {
             this.ctx.strokeStyle = style.strokeColor;
         }
-        
+
         if (style.thickness || style.strokeWidth) {
             this.ctx.lineWidth = (style.thickness || style.strokeWidth) / this.camera.zoom;
         }
-        
+
         if (style.opacity !== undefined) {
             this.ctx.globalAlpha = style.opacity;
         }
@@ -566,15 +566,15 @@ class UltimateCanvasController {
             if (geometry.style?.fill !== false) {
                 this.renderPolygon(geometry.polygon, true, false);
             }
-            
+
             // Then stroke
             this.renderPolygon(geometry.polygon, false, true);
-            
+
             // Add validation indicator if invalid
             if (geometry.properties?.isValid === false) {
                 this.renderValidationIndicator(geometry);
             }
-            
+
             // Add label
             this.renderIlotLabel(geometry);
         }
@@ -594,20 +594,20 @@ class UltimateCanvasController {
 
     renderPolygon(polygon, fill = false, stroke = true) {
         if (!Array.isArray(polygon) || polygon.length < 3) return;
-        
+
         this.ctx.beginPath();
         this.ctx.moveTo(polygon[0][0], polygon[0][1]);
-        
+
         for (let i = 1; i < polygon.length; i++) {
             this.ctx.lineTo(polygon[i][0], polygon[i][1]);
         }
-        
+
         this.ctx.closePath();
-        
+
         if (fill) {
             this.ctx.fill();
         }
-        
+
         if (stroke) {
             this.ctx.stroke();
         }
@@ -615,15 +615,15 @@ class UltimateCanvasController {
 
     renderValidationIndicator(geometry) {
         if (!geometry.bbox) return;
-        
+
         const centerX = (geometry.bbox.minX + geometry.bbox.maxX) / 2;
         const centerY = (geometry.bbox.minY + geometry.bbox.maxY) / 2;
         const size = 0.3 / this.camera.zoom;
-        
+
         this.ctx.save();
         this.ctx.strokeStyle = '#ef4444';
         this.ctx.lineWidth = 3 / this.camera.zoom;
-        
+
         // Draw X
         this.ctx.beginPath();
         this.ctx.moveTo(centerX - size, centerY - size);
@@ -631,25 +631,25 @@ class UltimateCanvasController {
         this.ctx.moveTo(centerX + size, centerY - size);
         this.ctx.lineTo(centerX - size, centerY + size);
         this.ctx.stroke();
-        
+
         this.ctx.restore();
     }
 
     renderIlotLabel(geometry) {
         if (!geometry.bbox || this.camera.zoom < 0.5) return;
-        
+
         const centerX = (geometry.bbox.minX + geometry.bbox.maxX) / 2;
         const centerY = (geometry.bbox.minY + geometry.bbox.maxY) / 2;
-        
+
         this.ctx.save();
         this.ctx.fillStyle = '#374151';
         this.ctx.font = `${12 / this.camera.zoom}px Arial`;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
-        
+
         const label = geometry.id || 'Îlot';
         this.ctx.fillText(label, centerX, centerY);
-        
+
         this.ctx.restore();
     }
 
@@ -659,10 +659,10 @@ class UltimateCanvasController {
         this.ctx.font = `${24 / this.camera.zoom}px Arial`;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
-        
+
         this.ctx.fillText('No content to display', 0, 0);
         this.ctx.fillText('Load a floor plan to begin', 0, 30 / this.camera.zoom);
-        
+
         this.ctx.restore();
     }
 
@@ -672,22 +672,22 @@ class UltimateCanvasController {
         this.ctx.font = `${16 / this.camera.zoom}px Arial`;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
-        
+
         this.ctx.fillText('Render Error:', 0, -15 / this.camera.zoom);
         this.ctx.fillText(error.message.substring(0, 50), 0, 15 / this.camera.zoom);
-        
+
         this.ctx.restore();
     }
 
     renderUI() {
         if (!this.renderConfig.showDebugInfo) return;
-        
+
         this.ctx.save();
         this.ctx.fillStyle = '#1f2937';
         this.ctx.font = '12px Arial';
         this.ctx.textAlign = 'left';
         this.ctx.textBaseline = 'top';
-        
+
         const info = [
             `Zoom: ${this.camera.zoom.toFixed(2)}x`,
             `Position: ${this.camera.x.toFixed(1)}, ${this.camera.y.toFixed(1)}`,
@@ -696,11 +696,11 @@ class UltimateCanvasController {
             `FPS: ${this.state.frameCount}`,
             `Interactions: ${this.debug.interactions}`
         ];
-        
+
         for (let i = 0; i < info.length; i++) {
             this.ctx.fillText(info[i], 10, 10 + i * 15);
         }
-        
+
         this.ctx.restore();
     }
 
@@ -718,10 +718,10 @@ class UltimateCanvasController {
         const rect = this.canvas.getBoundingClientRect();
         const centerX = rect.width / 2;
         const centerY = rect.height / 2;
-        
+
         const x = (screenX - centerX) / this.camera.zoom + this.camera.x;
         const y = (screenY - centerY) / this.camera.zoom + this.camera.y;
-        
+
         return [x, y];
     }
 
@@ -729,10 +729,10 @@ class UltimateCanvasController {
         const rect = this.canvas.getBoundingClientRect();
         const centerX = rect.width / 2;
         const centerY = rect.height / 2;
-        
+
         const x = (worldX - this.camera.x) * this.camera.zoom + centerX;
         const y = (worldY - this.camera.y) * this.camera.zoom + centerY;
-        
+
         return [x, y];
     }
 
@@ -740,7 +740,7 @@ class UltimateCanvasController {
         const rect = this.canvas.getBoundingClientRect();
         const halfWidth = rect.width / (2 * this.camera.zoom);
         const halfHeight = rect.height / (2 * this.camera.zoom);
-        
+
         return {
             minX: this.camera.x - halfWidth,
             maxX: this.camera.x + halfWidth,
@@ -751,10 +751,10 @@ class UltimateCanvasController {
 
     isGeometryVisible(geometry) {
         if (!geometry.bbox) return true;
-        
+
         const viewBounds = this.getVisibleBounds();
         const geomBounds = geometry.bbox;
-        
+
         return !(geomBounds.maxX < viewBounds.minX || 
                 geomBounds.minX > viewBounds.maxX ||
                 geomBounds.maxY < viewBounds.minY || 
@@ -766,7 +766,7 @@ class UltimateCanvasController {
         this.camera.y = 0;
         this.camera.zoom = 1;
         this.camera.rotation = 0;
-        
+
         this.scheduleRender();
         this.emit('cameraChanged', this.getCameraState());
     }
@@ -774,22 +774,22 @@ class UltimateCanvasController {
     fitToView() {
         const sceneBounds = this.parent?.sharedScene?.getBounds();
         if (!sceneBounds) return;
-        
+
         const rect = this.canvas.getBoundingClientRect();
         const padding = 50;
-        
+
         const boundsWidth = sceneBounds.maxX - sceneBounds.minX;
         const boundsHeight = sceneBounds.maxY - sceneBounds.minY;
-        
+
         if (boundsWidth === 0 || boundsHeight === 0) return;
-        
+
         const scaleX = (rect.width - padding * 2) / boundsWidth;
         const scaleY = (rect.height - padding * 2) / boundsHeight;
-        
+
         this.camera.zoom = Math.min(scaleX, scaleY, this.camera.maxZoom);
         this.camera.x = (sceneBounds.minX + sceneBounds.maxX) / 2;
         this.camera.y = (sceneBounds.minY + sceneBounds.maxY) / 2;
-        
+
         this.scheduleRender();
         this.emit('cameraChanged', this.getCameraState());
     }
@@ -798,7 +798,7 @@ class UltimateCanvasController {
         this.debug.renderTime = performance.now() - startTime;
         this.state.frameCount++;
         this.state.lastRender = Date.now();
-        
+
         // Reset frame count every second
         if (!this.fpsInterval) {
             this.fpsInterval = setInterval(() => {
@@ -882,17 +882,17 @@ class UltimateCanvasController {
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
         }
-        
+
         if (this.fpsInterval) {
             clearInterval(this.fpsInterval);
         }
-        
+
         if (this.resizeTimeout) {
             clearTimeout(this.resizeTimeout);
         }
-        
+
         this.eventListeners.clear();
-        
+
         console.log('[UltimateCanvasController] Destroyed');
     }
 }

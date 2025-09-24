@@ -34,44 +34,44 @@ class AdvancedIlotsManager {
 
             // Îlot types with professional specifications
             types: {
-                work: {
-                    baseSize: { width: 3.0, height: 2.0 },
-                    capacity: 4,
+                work: { 
+                    baseSize: { width: 3.0, height: 2.0 }, 
+                    capacity: 4, 
                     priority: 1.0,
                     color: 0x3b82f6,
                     equipment: ['desks', 'chairs', 'monitors', 'storage']
                 },
-                meeting: {
-                    baseSize: { width: 4.0, height: 3.0 },
-                    capacity: 8,
+                meeting: { 
+                    baseSize: { width: 4.0, height: 3.0 }, 
+                    capacity: 8, 
                     priority: 0.9,
                     color: 0x10b981,
                     equipment: ['table', 'chairs', 'whiteboard', 'projector']
                 },
-                social: {
-                    baseSize: { width: 4.5, height: 3.5 },
-                    capacity: 12,
+                social: { 
+                    baseSize: { width: 4.5, height: 3.5 }, 
+                    capacity: 12, 
                     priority: 0.7,
                     color: 0xf59e0b,
                     equipment: ['seating', 'coffee_table', 'plants', 'entertainment']
                 },
-                break: {
-                    baseSize: { width: 3.5, height: 2.5 },
-                    capacity: 6,
+                break: { 
+                    baseSize: { width: 3.5, height: 2.5 }, 
+                    capacity: 6, 
                     priority: 0.8,
                     color: 0x8b5cf6,
                     equipment: ['seating', 'tables', 'microwave', 'refrigerator']
                 },
-                focus: {
-                    baseSize: { width: 2.5, height: 2.0 },
-                    capacity: 2,
+                focus: { 
+                    baseSize: { width: 2.5, height: 2.0 }, 
+                    capacity: 2, 
                     priority: 0.6,
                     color: 0x06b6d4,
                     equipment: ['desk', 'chair', 'privacy_screen', 'lighting']
                 },
-                collaboration: {
-                    baseSize: { width: 5.0, height: 4.0 },
-                    capacity: 10,
+                collaboration: { 
+                    baseSize: { width: 5.0, height: 4.0 }, 
+                    capacity: 10, 
                     priority: 0.9,
                     color: 0xef4444,
                     equipment: ['modular_furniture', 'whiteboards', 'screens']
@@ -413,8 +413,8 @@ class AdvancedIlotsManager {
         const cellHeight = (room.height - ilotSpacing) / gridLayout.rows;
 
         // Calculate center position of grid cell
-        const x = room.center.x - room.width / 2 + ilotSpacing / 2 + cellWidth * (col + 0.5);
-        const y = room.center.y - room.height / 2 + ilotSpacing / 2 + cellHeight * (row + 0.5);
+        const x = room.center.x - room.width/2 + ilotSpacing/2 + cellWidth * (col + 0.5);
+        const y = room.center.y - room.height/2 + ilotSpacing/2 + cellHeight * (row + 0.5);
 
         return {
             x: x,
@@ -443,8 +443,8 @@ class AdvancedIlotsManager {
             // Check clearance requirements
             if (this.geometryEngine) {
                 const ilotRect = this.geometryEngine.createRectangle(
-                    position.x, position.y,
-                    ilotConfig.baseSize.width,
+                    position.x, position.y, 
+                    ilotConfig.baseSize.width, 
                     ilotConfig.baseSize.height
                 );
 
@@ -482,7 +482,7 @@ class AdvancedIlotsManager {
         const ilotId = `ilot_${room.id}_${ilotType}_${index}`;
 
         // Create polygon for the îlot
-        const polygon = this.geometryEngine ?
+        const polygon = this.geometryEngine ? 
             this.geometryEngine.createRectangle(
                 position.x, position.y,
                 ilotConfig.baseSize.width,
@@ -594,7 +594,7 @@ class AdvancedIlotsManager {
         const validIlots = [];
 
         for (const ilot of ilots) {
-            const hasConflict = validIlots.some(existing =>
+            const hasConflict = validIlots.some(existing => 
                 this.calculateDistance(ilot.position, existing.position) < this.configurations.minDistance
             );
 
@@ -886,32 +886,32 @@ class AdvancedIlotsManager {
 
             // Main label
             const typeLabel = ilot.type.toUpperCase().replace('_', ' ');
-            context.fillText(typeLabel, canvas.width / 2, 50);
+            context.fillText(typeLabel, canvas.width/2, 50);
 
             // Details
             context.font = '18px Arial';
-            context.fillText(`Capacity: ${ilot.capacity}`, canvas.width / 2, 90);
+            context.fillText(`Capacity: ${ilot.capacity}`, canvas.width/2, 90);
 
             if (this.configurations.visualization.showEquipment) {
                 context.font = '14px Arial';
                 const equipment = ilot.equipment.slice(0, 3).join(', ');
-                context.fillText(equipment, canvas.width / 2, 120);
+                context.fillText(equipment, canvas.width/2, 120);
             }
 
             // Validation status
             if (ilot.properties.isValid === false) {
                 context.fillStyle = '#ef4444';
                 context.font = 'bold 16px Arial';
-                context.fillText('⚠ NON-COMPLIANT', canvas.width / 2, 160);
+                context.fillText('⚠ NON-COMPLIANT', canvas.width/2, 160);
             } else {
                 context.fillStyle = '#10b981';
                 context.font = 'bold 16px Arial';
-                context.fillText('✓ COMPLIANT', canvas.width / 2, 160);
+                context.fillText('✓ COMPLIANT', canvas.width/2, 160);
             }
 
             // Create sprite
             const texture = new THREE.CanvasTexture(canvas);
-            const spriteMaterial = new THREE.SpriteMaterial({
+            const spriteMaterial = new THREE.SpriteMaterial({ 
                 map: texture,
                 transparent: true
             });
@@ -994,8 +994,8 @@ class AdvancedIlotsManager {
             wheelchairAccessible: distanceToEntrance < 20,
             pathClearance: 'adequate',
             proximityScore: Math.max(0, 1 - (distanceToEntrance / 30)),
-            accessibilityRating: distanceToEntrance < 10 ? 'excellent' :
-                distanceToEntrance < 20 ? 'good' : 'fair',
+            accessibilityRating: distanceToEntrance < 10 ? 'excellent' : 
+                                distanceToEntrance < 20 ? 'good' : 'fair',
             clearanceZone: clearance
         };
     }
@@ -1035,8 +1035,8 @@ class AdvancedIlotsManager {
     }
 
     calculateComfortScore(ilot) {
-        return (ilot.accessibility.proximityScore * 0.4 +
-            ilot.efficiency * 0.6);
+        return (ilot.accessibility.proximityScore * 0.4 + 
+                ilot.efficiency * 0.6);
     }
 
     calculateEnhancedEfficiency(ilot) {
@@ -1058,10 +1058,10 @@ class AdvancedIlotsManager {
     calculateOptimizationImprovement(originalIlots, optimizedIlots) {
         if (originalIlots.length === 0) return 0;
 
-        const originalAvgScore = originalIlots.reduce((sum, ilot) =>
+        const originalAvgScore = originalIlots.reduce((sum, ilot) => 
             sum + (ilot.overallScore || 0.8), 0) / originalIlots.length;
 
-        const optimizedAvgScore = optimizedIlots.reduce((sum, ilot) =>
+        const optimizedAvgScore = optimizedIlots.reduce((sum, ilot) => 
             sum + this.calculateOverallScore(ilot), 0) / optimizedIlots.length;
 
         return optimizedAvgScore - originalAvgScore;

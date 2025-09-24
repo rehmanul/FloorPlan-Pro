@@ -46,8 +46,8 @@ try {
                     typeof bbox.maxY === 'number' && typeof bbox.minY === 'number'
                 );
                 if (!hasValidBounds) return false;
-                return !(item.maxX < bbox.minX || bbox.maxX < item.minX || 
-                        item.maxY < bbox.minY || bbox.maxY < item.minY);
+                return !(item.maxX < bbox.minX || bbox.maxX < item.minX ||
+                    item.maxY < bbox.minY || bbox.maxY < item.minY);
             });
         }
     };
@@ -70,12 +70,12 @@ try {
             return Array.isArray(polygon) ? [polygon] : [];
         }
         isValidPoint(point) {
-            return Array.isArray(point) && point.length >= 2 && 
-                   typeof point[0] === 'number' && typeof point[1] === 'number';
+            return Array.isArray(point) && point.length >= 2 &&
+                typeof point[0] === 'number' && typeof point[1] === 'number';
         }
         isValidPolygon(polygon) {
-            return Array.isArray(polygon) && polygon.length >= 3 && 
-                   polygon.every(point => this.isValidPoint(point));
+            return Array.isArray(polygon) && polygon.length >= 3 &&
+                polygon.every(point => this.isValidPoint(point));
         }
     };
 }
@@ -428,8 +428,8 @@ class IlotPlacementEngine {
         // Check for required coordinates
         return (
             (wall.start && wall.end && Array.isArray(wall.start) && Array.isArray(wall.end)) ||
-            (typeof wall.x1 === 'number' && typeof wall.y1 === 'number' && 
-             typeof wall.x2 === 'number' && typeof wall.y2 === 'number')
+            (typeof wall.x1 === 'number' && typeof wall.y1 === 'number' &&
+                typeof wall.x2 === 'number' && typeof wall.y2 === 'number')
         );
     }
 
@@ -450,7 +450,7 @@ class IlotPlacementEngine {
         for (const opening of openings) {
             try {
                 if (this.isValidOpening(opening)) {
-                    const clearanceZone = type === 'door' 
+                    const clearanceZone = type === 'door'
                         ? this.createDoorClearanceZone(opening)
                         : this.createWindowClearanceZone(opening);
 
@@ -525,7 +525,7 @@ class IlotPlacementEngine {
             let boundary = this.floorPlan?.boundary;
 
             if (!boundary) {
-                boundary = this.floorPlan?.bounds 
+                boundary = this.floorPlan?.bounds
                     ? this.createBoundaryFromBounds()
                     : this.createDefaultBoundary();
                 this.floorPlan.boundary = boundary;
@@ -566,7 +566,7 @@ class IlotPlacementEngine {
 
     isValidBoundary(boundary) {
         return Array.isArray(boundary) && boundary.length >= 3 &&
-               boundary.every(point => Array.isArray(point) && point.length >= 2);
+            boundary.every(point => Array.isArray(point) && point.length >= 2);
     }
 
     safeIndexConstraints() {
@@ -591,11 +591,11 @@ class IlotPlacementEngine {
 
     isValidBBox(bbox) {
         return bbox && typeof bbox === 'object' &&
-               typeof bbox.minX === 'number' && typeof bbox.maxX === 'number' &&
-               typeof bbox.minY === 'number' && typeof bbox.maxY === 'number' &&
-               !isNaN(bbox.minX) && !isNaN(bbox.maxX) && 
-               !isNaN(bbox.minY) && !isNaN(bbox.maxY) &&
-               bbox.minX <= bbox.maxX && bbox.minY <= bbox.maxY;
+            typeof bbox.minX === 'number' && typeof bbox.maxX === 'number' &&
+            typeof bbox.minY === 'number' && typeof bbox.maxY === 'number' &&
+            !isNaN(bbox.minX) && !isNaN(bbox.maxX) &&
+            !isNaN(bbox.minY) && !isNaN(bbox.maxY) &&
+            bbox.minX <= bbox.maxX && bbox.minY <= bbox.maxY;
     }
 
     /**
@@ -712,8 +712,8 @@ class IlotPlacementEngine {
 
     isValidPoint(point) {
         return Array.isArray(point) && point.length >= 2 &&
-               typeof point[0] === 'number' && typeof point[1] === 'number' &&
-               !isNaN(point[0]) && !isNaN(point[1]) && isFinite(point[0]) && isFinite(point[1]);
+            typeof point[0] === 'number' && typeof point[1] === 'number' &&
+            !isNaN(point[0]) && !isNaN(point[1]) && isFinite(point[0]) && isFinite(point[1]);
     }
 
     applySpatialModifiers(point, baseScore) {
@@ -774,7 +774,7 @@ class IlotPlacementEngine {
                 throw new Error('Invalid requirements or config');
             }
 
-            this.log('Executing placement strategy', { 
+            this.log('Executing placement strategy', {
                 strategy: config.placementStrategy,
                 targetIlots: requirements.totalIlots
             });
@@ -803,37 +803,137 @@ class IlotPlacementEngine {
         let placedCount = 0;
 
         try {
-            // Get sorted cells safely
-            const sortedCells = this.getSortedPlacementCells();
+            this.log('Executing optimized placement strategy - FIXED VERSION');
 
-            for (const cell of sortedCells) {
-                // Check timeout
-                if (Date.now() - startTime > config.timeoutMs) {
-                    this.logError('Placement timeout reached');
-                    break;
-                }
+            // CRITICAL FIX: Ensure sortedCells is never undefined
+            let sortedCells = [];
 
-                if (placedCount >= requirements.totalIlots) break;
-
-                const worldPos = this.gridToWorld(cell.x, cell.y);
-                if (!this.isValidPoint(worldPos)) continue;
-
-                const ilotType = requirements.ilotTypes[placedCount % requirements.ilotTypes.length];
-
-                // Attempt placement
-                const placement = await this.attemptIlotPlacement(worldPos, ilotType, config);
-
-                if (placement) {
-                    this.placedIlots.push(placement);
-                    this.indexPlacedIlot(placement);
-                    placedCount++;
-                    this.placementStats.successfulPlacements++;
-                }
-
-                this.placementStats.totalAttempts++;
+            try {
+                sortedCells = this.getSortedPlacementCells();
+                this.log('Got sorted cells', { count: sortedCells?.length || 0 });
+            } catch (error) {
+                this.logError('Failed to get sorted cells, creating emergency cells', error);
+                sortedCells = this.createEmergencyCells();
             }
+
+            // ADDITIONAL SAFETY: Validate sortedCells is an array
+            if (!Array.isArray(sortedCells)) {
+                this.logError('sortedCells is not an array, creating fallback');
+                sortedCells = this.createEmergencyCells();
+            }
+
+            if (sortedCells.length === 0) {
+                this.log('No sorted cells available, creating basic grid');
+                sortedCells = this.createEmergencyCells();
+            }
+
+            this.log('Starting optimized placement', {
+                targetIlots: requirements.totalIlots,
+                availableCells: sortedCells.length
+            });
+
+            // SAFE ITERATION: Now guaranteed to have valid array
+            for (let i = 0; i < sortedCells.length && placedCount < requirements.totalIlots; i++) {
+                try {
+                    // Check timeout
+                    if (Date.now() - startTime > config.timeoutMs) {
+                        this.log('Placement timeout reached');
+                        break;
+                    }
+
+                    const cell = sortedCells[i];
+
+                    // ADDITIONAL SAFETY: Validate cell structure
+                    if (!cell || typeof cell !== 'object') {
+                        continue;
+                    }
+
+                    const worldPos = this.gridToWorld(cell.x, cell.y);
+                    if (!this.isValidPoint(worldPos)) {
+                        continue;
+                    }
+
+                    const ilotType = requirements.ilotTypes[placedCount % requirements.ilotTypes.length];
+
+                    // Attempt placement using your existing method
+                    const placement = await this.attemptIlotPlacement(worldPos, ilotType, config);
+
+                    if (placement) {
+                        this.placedIlots.push(placement);
+                        this.indexPlacedIlot(placement);
+                        placedCount++;
+                        this.placementStats.successfulPlacements++;
+
+                        this.log(`Optimized placement: ${placedCount}/${requirements.totalIlots}`);
+                    }
+
+                    this.placementStats.totalAttempts++;
+
+                } catch (cellError) {
+                    this.logError(`Cell ${i} placement failed`, cellError);
+                    continue;
+                }
+            }
+
+            this.log('Optimized placement completed', {
+                placed: placedCount,
+                target: requirements.totalIlots,
+                successRate: placedCount / Math.max(requirements.totalIlots, 1)
+            });
+
         } catch (error) {
             this.logError('Optimized placement execution failed', error);
+
+            // FALLBACK: Use your existing fallback method
+            if (typeof this.executeFallbackPlacement === 'function') {
+                await this.executeFallbackPlacement(requirements, config);
+            }
+        }
+    }
+
+    // ADD this helper method to your class:
+    createEmergencyCells() {
+        this.log('Creating emergency placement cells');
+
+        try {
+            // Use your existing boundary/bounds logic
+            const boundary = this.floorPlan?.boundary || this.createBoundaryFromBounds();
+            const bbox = this.calculateBoundingBoxFromBoundary(boundary);
+
+            if (!this.isValidBBox(bbox)) {
+                // Ultimate fallback bounds
+                bbox = { minX: 0, minY: 0, maxX: 20, maxY: 15 };
+            }
+
+            const cells = [];
+            const spacing = this.config?.gridResolution || 1.0;
+
+            // Create grid cells
+            for (let x = 0; x < (bbox.maxX - bbox.minX) / spacing; x++) {
+                for (let y = 0; y < (bbox.maxY - bbox.minY) / spacing; y++) {
+                    cells.push({
+                        x: x,
+                        y: y,
+                        score: 0.8 // Default score
+                    });
+                }
+            }
+
+            this.log(`Created ${cells.length} emergency cells`);
+            return cells;
+
+        } catch (error) {
+            this.logError('Emergency cell creation failed', error);
+
+            // Ultimate fallback - basic grid
+            return [
+                { x: 2, y: 2, score: 0.8 },
+                { x: 5, y: 2, score: 0.8 },
+                { x: 8, y: 2, score: 0.8 },
+                { x: 2, y: 5, score: 0.8 },
+                { x: 5, y: 5, score: 0.8 },
+                { x: 8, y: 5, score: 0.8 }
+            ];
         }
     }
 
@@ -846,8 +946,8 @@ class IlotPlacementEngine {
             let placedCount = 0;
             const spacing = config.defaultIlotSize.width + config.minIlotDistance;
 
-            for (let x = bbox.minX + spacing/2; x < bbox.maxX - spacing/2 && placedCount < 5; x += spacing) {
-                for (let y = bbox.minY + spacing/2; y < bbox.maxY - spacing/2 && placedCount < 5; y += spacing) {
+            for (let x = bbox.minX + spacing / 2; x < bbox.maxX - spacing / 2 && placedCount < 5; x += spacing) {
+                for (let y = bbox.minY + spacing / 2; y < bbox.maxY - spacing / 2 && placedCount < 5; y += spacing) {
                     const worldPos = [x, y];
                     const ilotType = 'workspace';
 
@@ -1052,23 +1152,23 @@ class IlotPlacementEngine {
     }
 
     isValidDimensions(dimensions) {
-        return dimensions && 
-               typeof dimensions === 'object' &&
-               typeof dimensions.width === 'number' && 
-               typeof dimensions.height === 'number' &&
-               !isNaN(dimensions.width) && 
-               !isNaN(dimensions.height) &&
-               isFinite(dimensions.width) && 
-               isFinite(dimensions.height) &&
-               dimensions.width > 0 && 
-               dimensions.height > 0;
+        return dimensions &&
+            typeof dimensions === 'object' &&
+            typeof dimensions.width === 'number' &&
+            typeof dimensions.height === 'number' &&
+            !isNaN(dimensions.width) &&
+            !isNaN(dimensions.height) &&
+            isFinite(dimensions.width) &&
+            isFinite(dimensions.height) &&
+            dimensions.width > 0 &&
+            dimensions.height > 0;
     }
 
     isValidProperties(properties) {
-        return properties && 
-               typeof properties === 'object' &&
-               typeof properties.capacity === 'number' &&
-               Array.isArray(properties.equipment);
+        return properties &&
+            typeof properties === 'object' &&
+            typeof properties.capacity === 'number' &&
+            Array.isArray(properties.equipment);
     }
 
     findNearbyObstacles(position, dimensions) {
@@ -1182,9 +1282,9 @@ class IlotPlacementEngine {
             const halfHeight = dimensions.height / 2;
 
             return (position[0] - halfWidth >= bbox.minX &&
-                    position[0] + halfWidth <= bbox.maxX &&
-                    position[1] - halfHeight >= bbox.minY &&
-                    position[1] + halfHeight <= bbox.maxY);
+                position[0] + halfWidth <= bbox.maxX &&
+                position[1] - halfHeight >= bbox.minY &&
+                position[1] + halfHeight <= bbox.maxY);
         } catch (error) {
             return false;
         }
@@ -1258,12 +1358,12 @@ class IlotPlacementEngine {
 
             // Comprehensive validation
             if (!this.isValidNumber(calculatedWidth) || !this.isValidNumber(calculatedHeight)) {
-                this.log('Warning: Invalid calculated dimensions, using defaults', { 
-                    ilotType: safeIlotType, 
-                    multiplier, 
-                    defaultSize, 
-                    calculatedWidth, 
-                    calculatedHeight 
+                this.log('Warning: Invalid calculated dimensions, using defaults', {
+                    ilotType: safeIlotType,
+                    multiplier,
+                    defaultSize,
+                    calculatedWidth,
+                    calculatedHeight
                 });
                 return { width: 3.0, height: 2.0 };
             }
@@ -1362,7 +1462,7 @@ class IlotPlacementEngine {
                 }
             }
 
-            if (typeof door.x === 'number' && typeof door.y === 'number' && 
+            if (typeof door.x === 'number' && typeof door.y === 'number' &&
                 !isNaN(door.x) && !isNaN(door.y)) {
                 return [door.x, door.y];
             }
@@ -1543,8 +1643,8 @@ class IlotPlacementEngine {
             if (wall.start && wall.end) {
                 start = wall.start;
                 end = wall.end;
-            } else if (wall.x1 !== undefined && wall.y1 !== undefined && 
-                      wall.x2 !== undefined && wall.y2 !== undefined) {
+            } else if (wall.x1 !== undefined && wall.y1 !== undefined &&
+                wall.x2 !== undefined && wall.y2 !== undefined) {
                 start = [wall.x1, wall.y1];
                 end = [wall.x2, wall.y2];
             } else {
@@ -1804,13 +1904,13 @@ class IlotPlacementEngine {
 
             let placedCount = 0;
 
-            for (let x = bbox.minX + ilotWidth/2; 
-                 x < bbox.maxX - ilotWidth/2 && placedCount < requirements.totalIlots; 
-                 x += ilotWidth + spacing) {
+            for (let x = bbox.minX + ilotWidth / 2;
+                x < bbox.maxX - ilotWidth / 2 && placedCount < requirements.totalIlots;
+                x += ilotWidth + spacing) {
 
-                for (let y = bbox.minY + ilotHeight/2; 
-                     y < bbox.maxY - ilotHeight/2 && placedCount < requirements.totalIlots; 
-                     y += ilotHeight + spacing) {
+                for (let y = bbox.minY + ilotHeight / 2;
+                    y < bbox.maxY - ilotHeight / 2 && placedCount < requirements.totalIlots;
+                    y += ilotHeight + spacing) {
 
                     const worldPos = [x, y];
                     const ilotType = requirements.ilotTypes[placedCount % requirements.ilotTypes.length];

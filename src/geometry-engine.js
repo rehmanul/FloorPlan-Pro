@@ -86,18 +86,18 @@ class ProductionGeometryEngine {
     }
 
     validatePoint(point) {
-        return Array.isArray(point) && 
-               point.length >= 2 && 
-               typeof point[0] === 'number' && 
-               typeof point[1] === 'number' &&
-               !isNaN(point[0]) && !isNaN(point[1]) &&
-               isFinite(point[0]) && isFinite(point[1]);
+        return Array.isArray(point) &&
+            point.length >= 2 &&
+            typeof point[0] === 'number' &&
+            typeof point[1] === 'number' &&
+            !isNaN(point[0]) && !isNaN(point[1]) &&
+            isFinite(point[0]) && isFinite(point[1]);
     }
 
     validatePolygon(polygon) {
-        return Array.isArray(polygon) && 
-               polygon.length >= 3 && 
-               polygon.every(point => this.validatePoint(point));
+        return Array.isArray(polygon) &&
+            polygon.length >= 3 &&
+            polygon.every(point => this.validatePoint(point));
     }
 
     /**
@@ -189,7 +189,7 @@ class ProductionGeometryEngine {
         this.clipperOffset.Execute(solution, scaledDistance);
 
         // Convert back to standard format
-        return solution.map(path => 
+        return solution.map(path =>
             this.scalePolygonFromClipper(path.map(pt => [pt.X, pt.Y]))
         );
     }
@@ -363,7 +363,7 @@ class ProductionGeometryEngine {
                 const [xi, yi] = polygon[i];
                 const [xj, yj] = polygon[j];
 
-                if (((yi > y) !== (yj > y)) && 
+                if (((yi > y) !== (yj > y)) &&
                     (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
                     inside = !inside;
                 }
@@ -403,7 +403,7 @@ class ProductionGeometryEngine {
 
         const onSegment = (p, q, r) => {
             return q[0] <= Math.max(p[0], r[0]) && q[0] >= Math.min(p[0], r[0]) &&
-                   q[1] <= Math.max(p[1], r[1]) && q[1] >= Math.min(p[1], r[1]);
+                q[1] <= Math.max(p[1], r[1]) && q[1] >= Math.min(p[1], r[1]);
         };
 
         const o1 = orientation(line1Start, line1End, line2Start);
@@ -439,7 +439,7 @@ class ProductionGeometryEngine {
                     id: geom.id || `item_${index}`,
                     geometry: geom
                 }))
-                .filter(item => 
+                .filter(item =>
                     item.minX <= item.maxX && item.minY <= item.maxY
                 );
 
@@ -447,9 +447,9 @@ class ProductionGeometryEngine {
                 this.spatialIndex.load(indexItems);
             }
 
-            this.log('Spatial index built', { 
+            this.log('Spatial index built', {
                 totalItems: geometries.length,
-                indexedItems: indexItems.length 
+                indexedItems: indexItems.length
             });
 
         } catch (error) {
@@ -519,10 +519,10 @@ class ProductionGeometryEngine {
 
     bboxesIntersect(bbox1, bbox2) {
         try {
-            return !(bbox1.maxX < bbox2.minX || 
-                    bbox2.maxX < bbox1.minX || 
-                    bbox1.maxY < bbox2.minY || 
-                    bbox2.maxY < bbox1.minY);
+            return !(bbox1.maxX < bbox2.minX ||
+                bbox2.maxX < bbox1.minX ||
+                bbox1.maxY < bbox2.minY ||
+                bbox2.maxY < bbox1.minY);
         } catch (error) {
             return false;
         }
@@ -854,8 +854,8 @@ class FallbackSpatialIndex {
 
     search(bbox) {
         return this.items.filter(item => {
-            return !(item.maxX < bbox.minX || bbox.maxX < item.minX || 
-                    item.maxY < bbox.minY || bbox.maxY < item.minY);
+            return !(item.maxX < bbox.minX || bbox.maxX < item.minX ||
+                item.maxY < bbox.minY || bbox.maxY < item.minY);
         });
     }
 
