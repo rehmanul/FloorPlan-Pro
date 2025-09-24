@@ -1744,15 +1744,24 @@
                 let isDragging = false;
                 let lastX = 0;
                 let lastY = 0;
+                let hasMouseMoved = false;
 
                 this.canvas.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     isDragging = true;
+                    hasMouseMoved = false;
                     lastX = e.clientX;
                     lastY = e.clientY;
+                    this.canvas.style.cursor = 'grabbing';
                 });
 
                 this.canvas.addEventListener('mousemove', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
                     if (isDragging) {
+                        hasMouseMoved = true;
                         const deltaX = e.clientX - lastX;
                         const deltaY = e.clientY - lastY;
                         this.offsetX += deltaX;
@@ -1763,19 +1772,64 @@
                     }
                 });
 
-                this.canvas.addEventListener('mouseup', () => {
+                this.canvas.addEventListener('mouseup', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
                     isDragging = false;
+                    this.canvas.style.cursor = 'crosshair';
+                    
+                    // Only trigger click events if mouse didn't move (pure click)
+                    if (!hasMouseMoved) {
+                        this.handleCanvasClick(e);
+                    }
+                    hasMouseMoved = false;
                 });
 
                 this.canvas.addEventListener('wheel', (e) => {
                     e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const rect = this.canvas.getBoundingClientRect();
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    
                     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                    const oldScale = this.scale;
                     this.scale *= zoomFactor;
+                    
+                    // Zoom towards mouse position
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+                    
+                    this.offsetX = mouseX - (mouseX - this.offsetX) * (this.scale / oldScale);
+                    this.offsetY = mouseY - (mouseY - this.offsetY) * (this.scale / oldScale);
+                    
                     this.render();
+                });
+
+                // Prevent context menu
+                this.canvas.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
                 });
             }
 
+            handleCanvasClick(e) {
+                // Handle canvas click without interfering with view switching
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                console.log('Canvas clicked at:', x, y);
+                // Add any click handling logic here without switching views
+            }
+
             render(floorPlan, ilots = [], corridors = []) {
+                // Only render if canvas is visible and in canvas view
+                if (currentView !== 'canvas' || this.canvas.style.display === 'none') {
+                    return;
+                }
+
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
                 if (!floorPlan) {
@@ -1809,6 +1863,9 @@
                 this.renderRoomLabels(floorPlan.rooms);
 
                 this.ctx.restore();
+                
+                // Save state after successful render
+                preserveCanvasState();
             }
 
             renderPlaceholder() {
@@ -2135,9 +2192,18 @@
             document.getElementById('exportCADBtn').addEventListener('click', exportToCAD);
             document.getElementById('export3DBtn').addEventListener('click', exportTo3D);
 
-            // View controls
-            document.getElementById('autodeskViewBtn').addEventListener('click', () => switchToAutodeskView());
-            document.getElementById('canvasViewBtn').addEventListener('click', () => switchToCanvasView());
+            // View controls - prevent event bubbling
+            document.getElementById('autodeskViewBtn').addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                switchToAutodeskView();
+            });
+            
+            document.getElementById('canvasViewBtn').addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                switchToCanvasView();
+            });
         }
 
         async function handleFileUpload(file) {
@@ -3239,12 +3305,22 @@
         }
 
         // View Management
+        let currentView = 'autodesk'; // Track current view state
+
         function switchToAutodeskView() {
+            if (currentView === 'autodesk') return; // Prevent unnecessary switches
+            
+            currentView = 'autodesk';
             document.querySelectorAll('.header-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById('autodeskViewBtn').classList.add('active');
 
-            document.getElementById('floorPlanCanvas').style.display = 'none';
-            document.getElementById('forgeViewer').style.display = 'block';
+            const canvasElement = document.getElementById('floorPlanCanvas');
+            const viewerElement = document.getElementById('forgeViewer');
+            
+            canvasElement.style.display = 'none';
+            canvasElement.style.visibility = 'hidden';
+            viewerElement.style.display = 'block';
+            viewerElement.style.visibility = 'visible';
 
             if (viewer) {
                 viewer.resize();
@@ -3259,16 +3335,33 @@
         }
 
         function switchToCanvasView() {
+            if (currentView === 'canvas') return; // Prevent unnecessary switches
+            
+            currentView = 'canvas';
             document.querySelectorAll('.header-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById('canvasViewBtn').classList.add('active');
 
-            document.getElementById('floorPlanCanvas').style.display = 'block';
-            document.getElementById('forgeViewer').style.display = 'none';
+            const canvasElement = document.getElementById('floorPlanCanvas');
+            const viewerElement = document.getElementById('forgeViewer');
+            
+            viewerElement.style.display = 'none';
+            viewerElement.style.visibility = 'hidden';
+            canvasElement.style.display = 'block';
+            canvasElement.style.visibility = 'visible';
 
-            if (canvas && canvas.render) {
-                canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
-                if (currentFloorPlan) canvas.fitToView();
-            }
+            // Ensure canvas is properly sized and rendered
+            setTimeout(() => {
+                if (canvas) {
+                    canvas.resizeCanvas();
+                    if (canvas.render) {
+                        canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
+                        if (currentFloorPlan) {
+                            canvas.fitToView();
+                        }
+                    }
+                }
+            }, 100);
+            
             showNotification('Switched to Manual Canvas View', 'info', 2000);
         }
 
@@ -3286,6 +3379,40 @@
                 default:
                     switchToAutodeskView();
                     break;
+            }
+        }
+
+        // Canvas state preservation
+        function preserveCanvasState() {
+            if (canvas && currentFloorPlan) {
+                // Store current canvas state
+                const canvasState = {
+                    offsetX: canvas.offsetX,
+                    offsetY: canvas.offsetY,
+                    scale: canvas.scale,
+                    hasContent: true
+                };
+                
+                // Store in sessionStorage for persistence
+                sessionStorage.setItem('canvasState', JSON.stringify(canvasState));
+            }
+        }
+
+        function restoreCanvasState() {
+            const savedState = sessionStorage.getItem('canvasState');
+            if (savedState && canvas) {
+                try {
+                    const state = JSON.parse(savedState);
+                    canvas.offsetX = state.offsetX || 0;
+                    canvas.offsetY = state.offsetY || 0;
+                    canvas.scale = state.scale || 1;
+                    
+                    if (state.hasContent && currentFloorPlan) {
+                        canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
+                    }
+                } catch (error) {
+                    console.log('Failed to restore canvas state:', error);
+                }
             }
         }
 
@@ -4395,6 +4522,16 @@
             console.log('FloorPlan Pro - Production CAD Analysis Engine Loaded');
             showNotification('FloorPlan Pro ready for professional CAD analysis', 'success');
             setupStatusTimeout();
+            
+            // Initialize view state
+            currentView = 'autodesk'; // Start with autodesk view
+            
+            // Restore canvas state if available
+            setTimeout(() => {
+                if (currentView === 'canvas') {
+                    restoreCanvasState();
+                }
+            }, 500);
         });
     </script>
 </body>
