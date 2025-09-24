@@ -36,13 +36,24 @@ try {
             this.items = [];
         }
         insert(item) {
-            this.items.push(item);
+            if (item && typeof item === 'object') {
+                this.items.push(item);
+            }
         }
         search(bbox) {
-            return this.items.filter(item => 
-                !(item.maxX < bbox.minX || bbox.maxX < item.minX || 
-                  item.maxY < bbox.minY || bbox.maxY < item.minY)
-            );
+            if (!bbox || typeof bbox !== 'object') return [];
+            return this.items.filter(item => {
+                if (!item || typeof item !== 'object') return false;
+                const hasValidBounds = (
+                    typeof item.maxX === 'number' && typeof item.minX === 'number' &&
+                    typeof item.maxY === 'number' && typeof item.minY === 'number' &&
+                    typeof bbox.maxX === 'number' && typeof bbox.minX === 'number' &&
+                    typeof bbox.maxY === 'number' && typeof bbox.minY === 'number'
+                );
+                if (!hasValidBounds) return false;
+                return !(item.maxX < bbox.minX || bbox.maxX < item.minX || 
+                        item.maxY < bbox.minY || bbox.maxY < item.minY);
+            });
         }
     };
 }
@@ -53,11 +64,13 @@ try {
     // Fallback geometry engine
     GeometryEngine = class {
         constructor(options = {}) {
-            this.tolerance = options.tolerance || 0.001;
-            this.debugMode = options.debugMode || false;
+            this.tolerance = (options && typeof options.tolerance === 'number') ? options.tolerance : 0.001;
+            this.debugMode = (options && typeof options.debugMode === 'boolean') ? options.debugMode : false;
+            console.log('[GeometryEngine] GeometryEngine initialized', { tolerance: this.tolerance });
         }
         offsetPolygon(polygon, distance) {
-            return polygon; // Simplified fallback
+            // Return the original polygon as fallback
+            return Array.isArray(polygon) ? polygon : [];
         }
     };
 }
@@ -703,12 +716,19 @@ class IlotPlacementEngine {
             
             const validPosition = [x, y];
             
-            // Determine îlot dimensions
+            // Determine îlot dimensions with safety checks
             const dimensions = this.calculateIlotDimensions(ilotType, config);
             
-            // Validate dimensions
-            if (!dimensions || typeof dimensions.width !== 'number' || typeof dimensions.height !== 'number') {
-                this.log('Invalid dimensions calculated', { dimensions, ilotType });
+            // Validate dimensions with more thorough checks
+            if (!dimensions || 
+                typeof dimensions !== 'object' ||
+                typeof dimensions.width !== 'number' || 
+                typeof dimensions.height !== 'number' ||
+                isNaN(dimensions.width) || 
+                isNaN(dimensions.height) ||
+                dimensions.width <= 0 || 
+                dimensions.height <= 0) {
+                this.log('Invalid dimensions calculated', { dimensions, ilotType, config });
                 return null;
             }
             
@@ -717,10 +737,24 @@ class IlotPlacementEngine {
                 return null;
             }
             
-            // Generate properties first
+            // Generate properties with safety checks
             const properties = this.generateIlotProperties(ilotType || 'workspace');
+            if (!properties || typeof properties !== 'object') {
+                this.log('Invalid properties generated', { properties, ilotType });
+                return null;
+            }
             
-            // Create îlot object with safe coordinate access
+            // Calculate values with safety checks
+            const clearance = this.calculateIlotClearance(validPosition, dimensions);
+            const accessibility = this.calculateAccessibilityScore(validPosition);
+            const score = this.calculateOverallScore(validPosition, ilotType || 'workspace');
+            
+            // Validate calculated values
+            const safeClearance = (typeof clearance === 'number' && !isNaN(clearance)) ? clearance : this.config.minIlotDistance || 1.0;
+            const safeAccessibility = (typeof accessibility === 'number' && !isNaN(accessibility)) ? accessibility : 0.8;
+            const safeScore = (typeof score === 'number' && !isNaN(score)) ? score : 0.8;
+            
+            // Create îlot object with comprehensive safety checks
             const ilot = {
                 id: `ilot_${this.placedIlots.length + 1}`,
                 type: ilotType || 'workspace',
@@ -728,12 +762,12 @@ class IlotPlacementEngine {
                 y: y - dimensions.height / 2, // Top-left y for frontend
                 width: dimensions.width,
                 height: dimensions.height,
-                capacity: properties.capacity,
-                equipment: properties.equipment,
+                capacity: properties.capacity || 4,
+                equipment: Array.isArray(properties.equipment) ? properties.equipment : ['desks', 'chairs'],
                 isValid: true,
-                clearance: this.calculateIlotClearance(validPosition, dimensions),
-                accessibility: this.calculateAccessibilityScore(validPosition),
-                score: this.calculateOverallScore(validPosition, ilotType || 'workspace'),
+                clearance: safeClearance,
+                accessibility: safeAccessibility,
+                score: safeScore,
                 position: {
                     x: x,
                     y: y,
@@ -744,15 +778,19 @@ class IlotPlacementEngine {
                     height: dimensions.height
                 },
                 polygon: this.createRectanglePolygon(x, y, dimensions.width, dimensions.height),
-                properties: properties,
+                properties: {
+                    capacity: properties.capacity || 4,
+                    equipment: Array.isArray(properties.equipment) ? properties.equipment : ['desks', 'chairs'],
+                    priority: properties.priority || 1.0
+                },
                 validation: {
                     isValid: true,
-                    clearance: this.calculateIlotClearance(validPosition, dimensions),
-                    accessibility: this.calculateAccessibilityScore(validPosition),
+                    clearance: safeClearance,
+                    accessibility: safeAccessibility,
                     issues: []
                 },
                 metadata: {
-                    placementScore: this.calculateOverallScore(validPosition, ilotType || 'workspace'),
+                    placementScore: safeScore,
                     created: new Date().toISOString(),
                     placementMethod: 'optimized'
                 }
@@ -876,24 +914,58 @@ class IlotPlacementEngine {
      * @returns {Object} Dimensions {width, height}
      */
     calculateIlotDimensions(ilotType, config) {
-        const typeMultipliers = {
-            'workspace': 1.0,
-            'meeting': 1.3,
-            'social': 1.5,
-            'storage': 0.8,
-            'break': 1.2
-        };
-        
-        const multiplier = typeMultipliers[ilotType] || 1.0;
-        
-        // Use config or fallback to this.config or defaults
-        const configToUse = config || this.config || {};
-        const defaultSize = configToUse.defaultIlotSize || { width: 3.0, height: 2.0 };
-        
-        return {
-            width: defaultSize.width * multiplier,
-            height: defaultSize.height * multiplier
-        };
+        try {
+            const typeMultipliers = {
+                'workspace': 1.0,
+                'meeting': 1.3,
+                'social': 1.5,
+                'storage': 0.8,
+                'break': 1.2
+            };
+            
+            const safeIlotType = (typeof ilotType === 'string' && ilotType.length > 0) ? ilotType : 'workspace';
+            const multiplier = typeMultipliers[safeIlotType] || 1.0;
+            
+            // Use config or fallback to this.config or defaults with comprehensive safety checks
+            const configToUse = (config && typeof config === 'object') ? config : 
+                               (this.config && typeof this.config === 'object') ? this.config : {};
+            
+            let defaultSize = { width: 3.0, height: 2.0 };
+            
+            if (configToUse.defaultIlotSize && typeof configToUse.defaultIlotSize === 'object') {
+                const configSize = configToUse.defaultIlotSize;
+                if (typeof configSize.width === 'number' && !isNaN(configSize.width) && configSize.width > 0) {
+                    defaultSize.width = configSize.width;
+                }
+                if (typeof configSize.height === 'number' && !isNaN(configSize.height) && configSize.height > 0) {
+                    defaultSize.height = configSize.height;
+                }
+            }
+            
+            const calculatedWidth = defaultSize.width * multiplier;
+            const calculatedHeight = defaultSize.height * multiplier;
+            
+            // Validate calculated dimensions
+            if (isNaN(calculatedWidth) || isNaN(calculatedHeight) || calculatedWidth <= 0 || calculatedHeight <= 0) {
+                this.log('Warning: Invalid calculated dimensions, using defaults', { 
+                    ilotType: safeIlotType, 
+                    multiplier, 
+                    defaultSize, 
+                    calculatedWidth, 
+                    calculatedHeight 
+                });
+                return { width: 3.0, height: 2.0 };
+            }
+            
+            return {
+                width: calculatedWidth,
+                height: calculatedHeight
+            };
+            
+        } catch (error) {
+            this.logError('Error calculating îlot dimensions', error);
+            return { width: 3.0, height: 2.0 };
+        }
     }
 
     /**
@@ -1013,37 +1085,72 @@ class IlotPlacementEngine {
     }
 
     calculateAccessibilityScore(point) {
-        // Simplified accessibility calculation
-        let score = 0.8;
-        
-        // Check distance to nearest door
-        if (this.floorPlan.doors && Array.isArray(this.floorPlan.doors)) {
-            let minDistance = Infinity;
-            for (const door of this.floorPlan.doors) {
-                try {
-                    let doorPos;
-                    if (door.position && Array.isArray(door.position)) {
-                        doorPos = door.position;
-                    } else if (door.x !== undefined && door.y !== undefined) {
-                        doorPos = [door.x, door.y];
-                    } else {
-                        continue;
+        try {
+            // Validate input point
+            if (!Array.isArray(point) || point.length < 2) {
+                this.log('Warning: Invalid point for accessibility calculation', { point });
+                return 0.8;
+            }
+            
+            const x = Number(point[0]);
+            const y = Number(point[1]);
+            
+            if (isNaN(x) || isNaN(y)) {
+                this.log('Warning: Invalid coordinates for accessibility calculation', { point, x, y });
+                return 0.8;
+            }
+            
+            let score = 0.8;
+            
+            // Check distance to nearest door with comprehensive safety checks
+            if (this.floorPlan && 
+                this.floorPlan.doors && 
+                Array.isArray(this.floorPlan.doors) && 
+                this.floorPlan.doors.length > 0) {
+                
+                let minDistance = Infinity;
+                
+                for (const door of this.floorPlan.doors) {
+                    try {
+                        if (!door || typeof door !== 'object') continue;
+                        
+                        let doorPos = null;
+                        
+                        if (door.position && Array.isArray(door.position) && door.position.length >= 2) {
+                            const doorX = Number(door.position[0]);
+                            const doorY = Number(door.position[1]);
+                            if (!isNaN(doorX) && !isNaN(doorY)) {
+                                doorPos = [doorX, doorY];
+                            }
+                        } else if (typeof door.x === 'number' && typeof door.y === 'number' && 
+                                  !isNaN(door.x) && !isNaN(door.y)) {
+                            doorPos = [door.x, door.y];
+                        }
+                        
+                        if (doorPos) {
+                            const distance = this.calculateDistance([x, y], doorPos);
+                            if (typeof distance === 'number' && !isNaN(distance) && distance >= 0) {
+                                minDistance = Math.min(minDistance, distance);
+                            }
+                        }
+                    } catch (error) {
+                        this.log('Warning: Failed to calculate door distance', { door, error: error.message });
                     }
-                    
-                    const distance = this.calculateDistance(point, doorPos);
-                    minDistance = Math.min(minDistance, distance);
-                } catch (error) {
-                    this.log('Warning: Failed to calculate door distance', { door, error: error.message });
+                }
+                
+                // Better score for closer to doors (but not too close)
+                if (minDistance !== Infinity && minDistance > 1.5 && minDistance < 10) {
+                    score += 0.2;
                 }
             }
             
-            // Better score for closer to doors (but not too close)
-            if (minDistance > 1.5 && minDistance < 10) {
-                score += 0.2;
-            }
+            const finalScore = Math.min(score, 1.0);
+            return (typeof finalScore === 'number' && !isNaN(finalScore)) ? finalScore : 0.8;
+            
+        } catch (error) {
+            this.logError('Error calculating accessibility score', error);
+            return 0.8;
         }
-        
-        return Math.min(score, 1.0);
     }
 
     calculateWorkflowScore(point) {
@@ -1144,19 +1251,74 @@ class IlotPlacementEngine {
     }
 
     calculateIlotClearance(position, dimensions) {
-        return this.config.minIlotDistance; // Simplified
+        try {
+            // Validate inputs
+            if (!Array.isArray(position) || position.length < 2) {
+                this.log('Warning: Invalid position for clearance calculation', { position });
+                return this.config?.minIlotDistance || 1.0;
+            }
+            
+            if (!dimensions || typeof dimensions !== 'object' || 
+                typeof dimensions.width !== 'number' || typeof dimensions.height !== 'number') {
+                this.log('Warning: Invalid dimensions for clearance calculation', { dimensions });
+                return this.config?.minIlotDistance || 1.0;
+            }
+            
+            // Get minimum clearance from config with fallback
+            const minClearance = (this.config && typeof this.config.minIlotDistance === 'number') 
+                ? this.config.minIlotDistance 
+                : 1.0;
+            
+            return minClearance;
+            
+        } catch (error) {
+            this.logError('Error calculating îlot clearance', error);
+            return 1.0;
+        }
     }
 
     calculateOverallScore(position, ilotType) {
-        const accessibility = this.calculateAccessibilityScore(position);
-        const workflow = this.calculateWorkflowScore(position);
-        const spatial = 0.8; // Base spatial score
-        
-        return (
-            accessibility * this.config.weights.accessibility +
-            workflow * this.config.weights.workflow +
-            spatial * this.config.weights.spaceUtilization
-        );
+        try {
+            // Validate inputs
+            if (!Array.isArray(position) || position.length < 2) {
+                this.log('Warning: Invalid position for overall score calculation', { position });
+                return 0.8;
+            }
+            
+            const accessibility = this.calculateAccessibilityScore(position);
+            const workflow = this.calculateWorkflowScore(position);
+            const spatial = 0.8; // Base spatial score
+            
+            // Validate calculated scores
+            const safeAccessibility = (typeof accessibility === 'number' && !isNaN(accessibility)) ? accessibility : 0.8;
+            const safeWorkflow = (typeof workflow === 'number' && !isNaN(workflow)) ? workflow : 0.8;
+            const safeSpatial = (typeof spatial === 'number' && !isNaN(spatial)) ? spatial : 0.8;
+            
+            // Get weights with safety checks
+            const weights = (this.config && this.config.weights && typeof this.config.weights === 'object') 
+                ? this.config.weights 
+                : { accessibility: 0.3, workflow: 0.3, spaceUtilization: 0.4 };
+            
+            const accessibilityWeight = (typeof weights.accessibility === 'number' && !isNaN(weights.accessibility)) 
+                ? weights.accessibility : 0.3;
+            const workflowWeight = (typeof weights.workflow === 'number' && !isNaN(weights.workflow)) 
+                ? weights.workflow : 0.3;
+            const spatialWeight = (typeof weights.spaceUtilization === 'number' && !isNaN(weights.spaceUtilization)) 
+                ? weights.spaceUtilization : 0.4;
+            
+            const score = (
+                safeAccessibility * accessibilityWeight +
+                safeWorkflow * workflowWeight +
+                safeSpatial * spatialWeight
+            );
+            
+            const finalScore = (typeof score === 'number' && !isNaN(score)) ? Math.min(Math.max(score, 0), 1) : 0.8;
+            return finalScore;
+            
+        } catch (error) {
+            this.logError('Error calculating overall score', error);
+            return 0.8;
+        }
     }
 
     checkClearanceRequirements(position, dimensions) {
