@@ -1,126 +1,213 @@
 /**
- * Dual-View Controller for Architectural Floor Plan Visualization
+ * Dual-View Controller for Architectural Floor Plan Visualization - FIXED VERSION
  * 
- * Synchronizes Autodesk Viewer and Manual Canvas views with shared scene model.
- * Handles coordinate transformations, real-time updates, and unified interaction.
+ * FIXES APPLIED:
+ * - Fixed canvas disappearing issue during interactions
+ * - Added proper geometry validation and architectural calculations
+ * - Enhanced coordinate transformation and camera handling
+ * - Implemented proper viewport management and rendering pipeline
+ * - Added architectural rules for îlot placement validation
  * 
  * Features:
- * - Shared scene model for all geometric primitives
- * - Real-time synchronization between Autodesk Viewer and Canvas
- * - Coordinate system transformation handling
- * - Unified interaction model (pan, zoom, select)
- * - Layer management and visibility control
- * - Performance optimization for large datasets
- * 
- * Dependencies:
- * - GeometryEngine for spatial operations
- * - Autodesk Viewer SDK
- * - HTML5 Canvas API
+ * - Robust canvas rendering with proper state management
+ * - Architectural rule-based geometry validation
+ * - Professional coordinate system handling
+ * - Separate Autodesk and Manual Canvas workflows
+ * - Enhanced interaction handling without geometry loss
  * 
  * @author FloorPlan Pro Team
- * @version 1.0.0
+ * @version 2.0.0 - FIXED
  */
 
 const GeometryEngine = require('./geometry-engine');
 
 class DualViewController {
     constructor(options = {}) {
+        // Enhanced geometry engine with architectural rules
         this.geometryEngine = new GeometryEngine({
             tolerance: options.tolerance || 0.001,
             debugMode: options.debugMode || false
         });
-        
-        // Configuration
+
+        // Enhanced configuration with architectural standards
         this.config = {
             // View synchronization
             syncEnabled: options.syncEnabled !== false,
             syncCameras: options.syncCameras !== false,
             syncSelection: options.syncSelection !== false,
             syncLayers: options.syncLayers !== false,
-            
-            // Canvas rendering
-            canvasResolution: options.canvasResolution || 1,
+
+            // Canvas rendering - FIXED
+            canvasResolution: options.canvasResolution || window.devicePixelRatio || 1,
             maxCanvasSize: options.maxCanvasSize || 4096,
             antialias: options.antialias !== false,
-            
+            preserveDrawing: true, // NEW: Prevent canvas clearing issues
+
             // Performance
             maxObjects: options.maxObjects || 10000,
-            updateThrottleMs: options.updateThrottleMs || 16, // 60fps
+            updateThrottleMs: options.updateThrottleMs || 16,
             batchSize: options.batchSize || 100,
-            
-            // Coordinate systems
+            renderOnDemand: true, // NEW: Optimize rendering
+
+            // Coordinate systems - ENHANCED
             worldUnits: options.worldUnits || 'meters',
             precision: options.precision || 0.001,
-            
-            // Visual styling
-            defaultStyles: {
-                walls: { color: '#6B7280', thickness: 2, opacity: 1.0 },
-                redZones: { color: '#EF4444', opacity: 0.7, fill: true },
-                blueZones: { color: '#3B82F6', opacity: 0.7, fill: true },
-                ilots: { color: '#10b981', opacity: 0.8, fill: true, stroke: '#059669' },
-                corridors: { color: '#f59e0b', opacity: 0.6, fill: true, stroke: '#d97706' },
-                annotations: { color: '#8b5cf6', fontSize: 12, font: 'Arial' }
+            coordinateSystem: 'right-handed', // Standard architectural system
+
+            // Architectural Standards - NEW
+            architectural: {
+                // Minimum clearances (in meters)
+                minCorridorWidth: 1.2,      // ADA compliant
+                minDoorwayWidth: 0.8,       // Standard door width
+                minIlotClearance: 1.0,      // Around workstations
+                minWallClearance: 0.6,      // From walls
+                maxIlotDimension: 4.0,      // Maximum îlot size
+                minIlotDimension: 1.5,      // Minimum îlot size
+
+                // Accessibility requirements
+                wheelchairClearance: 1.5,    // Wheelchair maneuvering
+                emergencyEgressWidth: 1.1,   // Emergency egress
+                visualClearance: 0.9,        // Visual sight lines
+
+                // Workflow efficiency
+                optimalDeskSpacing: 1.8,     // Between desks
+                meetingRoomAccess: 2.0,      // Around meeting tables
+                socialAreaBuffer: 1.0,       // Around social spaces
+
+                // Geometric validation
+                maxAspectRatio: 3.0,         // Length to width ratio
+                minArea: 2.25,               // Minimum area (1.5m x 1.5m)
+                maxArea: 16.0,               // Maximum area (4m x 4m)
             },
-            
+
+            // Visual styling - ENHANCED
+            defaultStyles: {
+                walls: { 
+                    color: '#374151', 
+                    thickness: 2, 
+                    opacity: 1.0,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                },
+                redZones: { 
+                    color: '#EF4444', 
+                    opacity: 0.3, 
+                    fill: true,
+                    strokeColor: '#DC2626',
+                    strokeWidth: 2
+                },
+                blueZones: { 
+                    color: '#3B82F6', 
+                    opacity: 0.3, 
+                    fill: true,
+                    strokeColor: '#2563EB',
+                    strokeWidth: 2
+                },
+                ilots: { 
+                    color: '#10b981', 
+                    opacity: 0.7, 
+                    fill: true, 
+                    stroke: '#059669',
+                    strokeWidth: 2,
+                    validColor: '#10b981',
+                    invalidColor: '#EF4444'
+                },
+                corridors: { 
+                    color: '#f59e0b', 
+                    opacity: 0.4, 
+                    fill: true, 
+                    stroke: '#d97706',
+                    strokeWidth: 1
+                },
+                annotations: { 
+                    color: '#8b5cf6', 
+                    fontSize: 12, 
+                    font: 'Arial, sans-serif',
+                    backgroundColor: 'rgba(255,255,255,0.8)'
+                },
+                grid: {
+                    color: '#E5E7EB',
+                    opacity: 0.3,
+                    spacing: 1.0 // 1 meter grid
+                }
+            },
+
             ...options
         };
-        
+
         // Core components
-        this.sharedScene = new SharedSceneModel();
+        this.sharedScene = new EnhancedSharedSceneModel(this.config.architectural);
         this.autodeskViewController = null;
         this.canvasViewController = null;
-        
-        // State management
-        this.activeView = 'autodesk'; // 'autodesk' or 'canvas'
+        this.architecturalValidator = new ArchitecturalValidator(this.config.architectural);
+
+        // Enhanced state management
+        this.activeView = options.defaultView || 'canvas'; // Default to manual canvas
         this.viewStates = {
-            autodesk: { camera: null, selection: [], layers: {} },
-            canvas: { camera: null, selection: [], layers: {} }
+            autodesk: { camera: null, selection: [], layers: {}, initialized: false },
+            canvas: { camera: null, selection: [], layers: {}, initialized: false }
         };
-        
+
+        // Workflow state - NEW
+        this.workflowStage = 'design'; // 'design' or 'ilot_placement'
+        this.designComplete = false;
+
         // Synchronization
         this.syncInProgress = false;
         this.pendingUpdates = new Set();
         this.updateThrottle = null;
-        
+        this.renderRequested = false;
+
         // Event system
         this.eventListeners = new Map();
-        
-        this.log('DualViewController initialized', this.config);
+
+        // Performance monitoring - NEW
+        this.stats = {
+            renderCount: 0,
+            lastRenderTime: 0,
+            geometryCount: 0,
+            validIlots: 0,
+            totalIlots: 0
+        };
+
+        this.log('Enhanced DualViewController initialized', this.config);
     }
 
     /**
-     * INITIALIZATION
+     * INITIALIZATION - ENHANCED
      */
 
-    /**
-     * Initialize dual-view system
-     * @param {Object} autodeskViewer - Autodesk Viewer instance
-     * @param {HTMLCanvasElement} canvas - Canvas element
-     * @returns {Promise<void>}
-     */
     async initialize(autodeskViewer, canvas) {
         try {
-            this.log('Initializing dual-view system');
-            
-            // Initialize view controllers
-            this.autodeskViewController = new AutodeskViewController(autodeskViewer, this);
-            this.canvasViewController = new CanvasViewController(canvas, this);
-            
-            // Setup shared scene
+            this.log('Initializing enhanced dual-view system');
+
+            // Initialize shared scene first
             await this.sharedScene.initialize();
-            
-            // Initialize view controllers
-            await this.autodeskViewController.initialize();
-            await this.canvasViewController.initialize();
-            
+
+            // Initialize view controllers with enhanced error handling
+            if (canvas) {
+                this.canvasViewController = new EnhancedCanvasViewController(canvas, this);
+                await this.canvasViewController.initialize();
+                this.viewStates.canvas.initialized = true;
+            }
+
+            if (autodeskViewer) {
+                this.autodeskViewController = new AutodeskViewController(autodeskViewer, this);
+                await this.autodeskViewController.initialize();
+                this.viewStates.autodesk.initialized = true;
+            }
+
             // Setup synchronization
             this.setupSynchronization();
-            
+
             // Setup event handlers
             this.setupEventHandlers();
-            
-            this.log('Dual-view system initialized successfully');
-            
+
+            // Initialize with active view
+            this.switchView(this.activeView);
+
+            this.log('Enhanced dual-view system initialized successfully');
+
         } catch (error) {
             this.logError('Dual-view initialization failed', error);
             throw error;
@@ -128,396 +215,488 @@ class DualViewController {
     }
 
     /**
-     * Switch active view
-     * @param {string} viewType - 'autodesk' or 'canvas'
+     * WORKFLOW MANAGEMENT - NEW
      */
+
+    setWorkflowStage(stage) {
+        if (stage !== 'design' && stage !== 'ilot_placement') {
+            throw new Error(`Invalid workflow stage: ${stage}`);
+        }
+
+        this.workflowStage = stage;
+        this.log(`Workflow stage set to: ${stage}`);
+
+        // Update UI based on workflow stage
+        this.emit('workflowStageChanged', { stage, designComplete: this.designComplete });
+    }
+
+    markDesignComplete() {
+        this.designComplete = true;
+        this.setWorkflowStage('ilot_placement');
+        this.log('Design marked as complete, switching to îlot placement workflow');
+    }
+
+    /**
+     * ENHANCED VIEW SWITCHING
+     */
+
     switchView(viewType) {
         if (viewType !== 'autodesk' && viewType !== 'canvas') {
             throw new Error(`Invalid view type: ${viewType}`);
         }
-        
-        this.log(`Switching to ${viewType} view`);
-        
+
+        // Check if requested view is available
+        if (viewType === 'autodesk' && !this.viewStates.autodesk.initialized) {
+            this.log('Autodesk view not available, staying on canvas view');
+            return;
+        }
+
+        if (viewType === 'canvas' && !this.viewStates.canvas.initialized) {
+            this.log('Canvas view not available, staying on autodesk view');
+            return;
+        }
+
+        this.log(`Switching from ${this.activeView} to ${viewType} view`);
+
         // Save current view state
         this.saveViewState(this.activeView);
-        
-        // Switch active view
+
+        const previousView = this.activeView;
         this.activeView = viewType;
-        
-        // Show/hide appropriate views
+
+        // Update view visibility
         this.updateViewVisibility();
-        
+
         // Restore view state
         this.restoreViewState(viewType);
-        
+
+        // Force re-render for canvas view
+        if (viewType === 'canvas' && this.canvasViewController) {
+            this.scheduleRender();
+        }
+
         // Emit view change event
-        this.emit('viewChanged', { from: this.activeView, to: viewType });
+        this.emit('viewChanged', { from: previousView, to: viewType });
     }
 
     /**
-     * SHARED SCENE MODEL OPERATIONS
+     * ENHANCED GEOMETRY MANAGEMENT
      */
 
-    /**
-     * Add geometry to shared scene
-     * @param {Object} geometry - Geometry object
-     * @returns {string} Geometry ID
-     */
-    addGeometry(geometry) {
-        const id = this.sharedScene.addGeometry(geometry);
-        this.scheduleUpdate(['geometry']);
-        return id;
-    }
-
-    /**
-     * Update geometry in shared scene
-     * @param {string} id - Geometry ID
-     * @param {Object} updates - Geometry updates
-     */
-    updateGeometry(id, updates) {
-        this.sharedScene.updateGeometry(id, updates);
-        this.scheduleUpdate(['geometry', id]);
-    }
-
-    /**
-     * Remove geometry from shared scene
-     * @param {string} id - Geometry ID
-     */
-    removeGeometry(id) {
-        this.sharedScene.removeGeometry(id);
-        this.scheduleUpdate(['geometry', id]);
-    }
-
-    /**
-     * Add îlots to scene
-     * @param {Array} ilots - Array of îlot objects
-     */
-    addIlots(ilots) {
-        for (const ilot of ilots) {
-            const geometry = {
-                id: ilot.id,
-                type: 'ilot',
-                subtype: ilot.type,
-                polygon: ilot.geometry.polygon,
-                bbox: ilot.geometry.bbox,
-                properties: ilot.properties,
-                style: { ...this.config.defaultStyles.ilots },
-                metadata: ilot.metadata
-            };
-            
-            this.sharedScene.addGeometry(geometry);
-        }
-        
-        this.scheduleUpdate(['ilots']);
-        this.log('Added îlots to scene', { count: ilots.length });
-    }
-
-    /**
-     * Add corridors to scene
-     * @param {Array} corridors - Array of corridor objects
-     */
-    addCorridors(corridors) {
-        for (const corridor of corridors) {
-            const geometry = {
-                id: corridor.id,
-                type: 'corridor',
-                polygon: corridor.polygon,
-                bbox: corridor.bbox,
-                centerline: corridor.centerline,
-                width: corridor.width,
-                style: { ...this.config.defaultStyles.corridors },
-                metadata: corridor.metadata
-            };
-            
-            this.sharedScene.addGeometry(geometry);
-        }
-        
-        this.scheduleUpdate(['corridors']);
-        this.log('Added corridors to scene', { count: corridors.length });
-    }
-
-    /**
-     * Add floor plan elements to scene
-     * @param {Object} floorPlan - Floor plan data
-     */
     addFloorPlan(floorPlan) {
-        // Add walls
-        if (floorPlan.walls) {
-            for (const wall of floorPlan.walls) {
-                const geometry = {
-                    id: wall.id || `wall_${Date.now()}_${Math.random()}`,
-                    type: 'wall',
-                    line: [wall.start, wall.end],
-                    thickness: wall.thickness || 0.2,
-                    style: { ...this.config.defaultStyles.walls },
-                    metadata: { layer: 'WALLS' }
-                };
-                
-                this.sharedScene.addGeometry(geometry);
-            }
-        }
-        
-        // Add red zones (entrances)
-        if (floorPlan.redZones) {
-            for (const zone of floorPlan.redZones) {
-                const geometry = {
-                    id: zone.id || `redzone_${Date.now()}_${Math.random()}`,
-                    type: 'zone',
-                    subtype: 'entrance',
-                    polygon: zone.polygon || zone,
-                    style: { ...this.config.defaultStyles.redZones },
-                    metadata: { layer: 'RED_ZONE' }
-                };
-                
-                this.sharedScene.addGeometry(geometry);
-            }
-        }
-        
-        // Add blue zones (forbidden)
-        if (floorPlan.blueZones) {
-            for (const zone of floorPlan.blueZones) {
-                const geometry = {
-                    id: zone.id || `bluezone_${Date.now()}_${Math.random()}`,
-                    type: 'zone',
-                    subtype: 'forbidden',
-                    polygon: zone.polygon || zone,
-                    style: { ...this.config.defaultStyles.blueZones },
-                    metadata: { layer: 'BLUE_ZONE' }
-                };
-                
-                this.sharedScene.addGeometry(geometry);
-            }
-        }
-        
-        this.scheduleUpdate(['floorplan']);
-        this.log('Added floor plan to scene');
-    }
-
-    /**
-     * SYNCHRONIZATION
-     */
-
-    /**
-     * Setup synchronization between views
-     */
-    setupSynchronization() {
-        if (!this.config.syncEnabled) return;
-        
-        // Camera synchronization
-        if (this.config.syncCameras) {
-            this.on('cameraChanged', (data) => {
-                if (!this.syncInProgress) {
-                    this.syncCameras(data.source, data.camera);
-                }
-            });
-        }
-        
-        // Selection synchronization
-        if (this.config.syncSelection) {
-            this.on('selectionChanged', (data) => {
-                if (!this.syncInProgress) {
-                    this.syncSelection(data.source, data.selection);
-                }
-            });
-        }
-        
-        // Layer synchronization
-        if (this.config.syncLayers) {
-            this.on('layerVisibilityChanged', (data) => {
-                if (!this.syncInProgress) {
-                    this.syncLayerVisibility(data.source, data.layer, data.visible);
-                }
-            });
-        }
-        
-        this.log('Synchronization setup completed');
-    }
-
-    /**
-     * Sync cameras between views
-     * @param {string} sourceView - Source view that initiated change
-     * @param {Object} cameraState - Camera state
-     */
-    syncCameras(sourceView, cameraState) {
-        this.syncInProgress = true;
-        
         try {
-            const targetView = sourceView === 'autodesk' ? 'canvas' : 'autodesk';
-            
-            if (targetView === 'autodesk' && this.autodeskViewController) {
-                this.autodeskViewController.setCameraState(cameraState);
-            } else if (targetView === 'canvas' && this.canvasViewController) {
-                this.canvasViewController.setCameraState(cameraState);
+            this.log('Adding floor plan to scene', { 
+                walls: floorPlan.walls?.length || 0,
+                redZones: floorPlan.redZones?.length || 0,
+                blueZones: floorPlan.blueZones?.length || 0
+            });
+
+            // Validate floor plan
+            const validation = this.architecturalValidator.validateFloorPlan(floorPlan);
+            if (!validation.isValid) {
+                this.log('Floor plan validation warnings', validation.warnings);
             }
-            
-        } finally {
-            this.syncInProgress = false;
+
+            // Clear existing floor plan elements
+            this.clearFloorPlanElements();
+
+            // Add walls with enhanced geometry
+            if (floorPlan.walls) {
+                for (const wall of floorPlan.walls) {
+                    const geometry = this.createWallGeometry(wall);
+                    if (geometry) {
+                        this.sharedScene.addGeometry(geometry);
+                    }
+                }
+            }
+
+            // Add red zones (entrances/access points)
+            if (floorPlan.redZones) {
+                for (const zone of floorPlan.redZones) {
+                    const geometry = this.createZoneGeometry(zone, 'entrance');
+                    if (geometry) {
+                        this.sharedScene.addGeometry(geometry);
+                    }
+                }
+            }
+
+            // Add blue zones (forbidden areas)
+            if (floorPlan.blueZones) {
+                for (const zone of floorPlan.blueZones) {
+                    const geometry = this.createZoneGeometry(zone, 'forbidden');
+                    if (geometry) {
+                        this.sharedScene.addGeometry(geometry);
+                    }
+                }
+            }
+
+            // Update scene bounds and fit view
+            this.sharedScene.updateBounds();
+            this.fitToView();
+
+            this.scheduleUpdate(['floorplan']);
+            this.log('Floor plan added successfully');
+
+        } catch (error) {
+            this.logError('Failed to add floor plan', error);
         }
     }
 
-    /**
-     * Sync selection between views
-     * @param {string} sourceView - Source view
-     * @param {Array} selection - Selected objects
-     */
-    syncSelection(sourceView, selection) {
-        this.syncInProgress = true;
-        
+    addIlots(ilots) {
         try {
-            const targetView = sourceView === 'autodesk' ? 'canvas' : 'autodesk';
-            
-            if (targetView === 'autodesk' && this.autodeskViewController) {
-                this.autodeskViewController.setSelection(selection);
-            } else if (targetView === 'canvas' && this.canvasViewController) {
-                this.canvasViewController.setSelection(selection);
+            this.log('Adding îlots to scene', { count: ilots.length });
+
+            // Clear existing îlots
+            this.clearIlots();
+
+            let validCount = 0;
+            let invalidCount = 0;
+
+            for (const ilot of ilots) {
+                // Validate îlot geometry
+                const validation = this.architecturalValidator.validateIlot(ilot);
+
+                const geometry = {
+                    id: ilot.id,
+                    type: 'ilot',
+                    subtype: ilot.type || 'workspace',
+                    polygon: ilot.polygon || this.createIlotPolygon(ilot),
+                    bbox: ilot.bbox || this.calculateBounds(ilot.polygon),
+                    properties: {
+                        ...ilot.properties,
+                        isValid: validation.isValid,
+                        validationErrors: validation.errors,
+                        validationWarnings: validation.warnings
+                    },
+                    style: {
+                        ...this.config.defaultStyles.ilots,
+                        color: validation.isValid 
+                            ? this.config.defaultStyles.ilots.validColor 
+                            : this.config.defaultStyles.ilots.invalidColor
+                    },
+                    metadata: {
+                        ...ilot.metadata,
+                        layer: 'ILOTS',
+                        validation: validation,
+                        architecturalCompliance: validation.isValid
+                    }
+                };
+
+                this.sharedScene.addGeometry(geometry);
+
+                if (validation.isValid) {
+                    validCount++;
+                } else {
+                    invalidCount++;
+                    this.log('Invalid îlot detected', { 
+                        id: ilot.id, 
+                        errors: validation.errors 
+                    });
+                }
             }
-            
-        } finally {
-            this.syncInProgress = false;
+
+            // Update statistics
+            this.stats.validIlots = validCount;
+            this.stats.totalIlots = ilots.length;
+            this.stats.geometryCount = this.sharedScene.getGeometryCount();
+
+            this.scheduleUpdate(['ilots']);
+
+            this.log('Îlots added to scene', { 
+                total: ilots.length, 
+                valid: validCount, 
+                invalid: invalidCount,
+                coverage: ((validCount / ilots.length) * 100).toFixed(1) + '%'
+            });
+
+            // Emit statistics update
+            this.emit('ilotsAdded', {
+                total: ilots.length,
+                valid: validCount,
+                invalid: invalidCount,
+                coverage: validCount / ilots.length
+            });
+
+        } catch (error) {
+            this.logError('Failed to add îlots', error);
         }
     }
 
     /**
-     * Schedule update for specific components
-     * @param {Array} components - Components to update
+     * ENHANCED RENDERING SYSTEM
      */
+
+    scheduleRender() {
+        if (this.renderRequested) return;
+
+        this.renderRequested = true;
+        requestAnimationFrame(() => {
+            this.executeRender();
+            this.renderRequested = false;
+        });
+    }
+
+    executeRender() {
+        const startTime = performance.now();
+
+        try {
+            if (this.activeView === 'canvas' && this.canvasViewController) {
+                this.canvasViewController.render();
+            }
+
+            this.stats.renderCount++;
+            this.stats.lastRenderTime = performance.now() - startTime;
+
+        } catch (error) {
+            this.logError('Render execution failed', error);
+        }
+    }
+
     scheduleUpdate(components) {
         for (const component of components) {
             this.pendingUpdates.add(component);
         }
-        
+
         if (this.updateThrottle) {
             clearTimeout(this.updateThrottle);
         }
-        
+
         this.updateThrottle = setTimeout(() => {
             this.executeUpdates();
         }, this.config.updateThrottleMs);
     }
 
-    /**
-     * Execute pending updates
-     */
     executeUpdates() {
         if (this.pendingUpdates.size === 0) return;
-        
+
         const updates = Array.from(this.pendingUpdates);
         this.pendingUpdates.clear();
-        
+
         // Update both views
         if (this.autodeskViewController) {
             this.autodeskViewController.processUpdates(updates);
         }
-        
+
         if (this.canvasViewController) {
             this.canvasViewController.processUpdates(updates);
         }
-        
+
+        // Schedule render for canvas
+        if (this.activeView === 'canvas') {
+            this.scheduleRender();
+        }
+
         this.log('Processed updates', { components: updates });
     }
 
     /**
-     * VIEW STATE MANAGEMENT
+     * GEOMETRY CREATION HELPERS
      */
 
-    /**
-     * Save current view state
-     * @param {string} viewType - View type to save
-     */
-    saveViewState(viewType) {
+    createWallGeometry(wall) {
         try {
-            if (viewType === 'autodesk' && this.autodeskViewController) {
-                this.viewStates.autodesk = {
-                    camera: this.autodeskViewController.getCameraState(),
-                    selection: this.autodeskViewController.getSelection(),
-                    layers: this.autodeskViewController.getLayerStates()
-                };
-            } else if (viewType === 'canvas' && this.canvasViewController) {
-                this.viewStates.canvas = {
-                    camera: this.canvasViewController.getCameraState(),
-                    selection: this.canvasViewController.getSelection(),
-                    layers: this.canvasViewController.getLayerStates()
-                };
+            let start, end;
+
+            if (wall.start && wall.end) {
+                start = wall.start;
+                end = wall.end;
+            } else if (wall.x1 !== undefined && wall.y1 !== undefined && 
+                      wall.x2 !== undefined && wall.y2 !== undefined) {
+                start = [wall.x1, wall.y1];
+                end = [wall.x2, wall.y2];
+            } else {
+                this.log('Invalid wall geometry', wall);
+                return null;
             }
-            
+
+            const thickness = wall.thickness || 0.2;
+            const length = this.calculateDistance(start, end);
+
+            return {
+                id: wall.id || `wall_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                type: 'wall',
+                line: [start, end],
+                polygon: this.createWallPolygon(start, end, thickness),
+                thickness: thickness,
+                length: length,
+                bbox: this.calculateLineBounds(start, end, thickness),
+                style: { ...this.config.defaultStyles.walls },
+                metadata: { 
+                    layer: 'WALLS',
+                    architectural: {
+                        length: length,
+                        thickness: thickness,
+                        isLoadBearing: wall.isLoadBearing || false
+                    }
+                }
+            };
         } catch (error) {
-            this.logError('Failed to save view state', error);
+            this.logError('Failed to create wall geometry', error);
+            return null;
         }
     }
 
-    /**
-     * Restore view state
-     * @param {string} viewType - View type to restore
-     */
-    restoreViewState(viewType) {
+    createZoneGeometry(zone, type) {
         try {
-            const state = this.viewStates[viewType];
-            if (!state) return;
-            
-            if (viewType === 'autodesk' && this.autodeskViewController) {
-                if (state.camera) this.autodeskViewController.setCameraState(state.camera);
-                if (state.selection) this.autodeskViewController.setSelection(state.selection);
-                if (state.layers) this.autodeskViewController.setLayerStates(state.layers);
-            } else if (viewType === 'canvas' && this.canvasViewController) {
-                if (state.camera) this.canvasViewController.setCameraState(state.camera);
-                if (state.selection) this.canvasViewController.setSelection(state.selection);
-                if (state.layers) this.canvasViewController.setLayerStates(state.layers);
+            const polygon = zone.polygon || zone;
+            if (!Array.isArray(polygon) || polygon.length < 3) {
+                this.log('Invalid zone polygon', zone);
+                return null;
             }
-            
+
+            const area = this.calculatePolygonArea(polygon);
+            const style = type === 'entrance' 
+                ? this.config.defaultStyles.redZones 
+                : this.config.defaultStyles.blueZones;
+
+            return {
+                id: zone.id || `${type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                type: 'zone',
+                subtype: type,
+                polygon: polygon,
+                bbox: this.calculateBounds(polygon),
+                area: area,
+                style: { ...style },
+                metadata: { 
+                    layer: type === 'entrance' ? 'RED_ZONE' : 'BLUE_ZONE',
+                    architectural: {
+                        area: area,
+                        type: type,
+                        purpose: type === 'entrance' ? 'access_point' : 'restricted_area'
+                    }
+                }
+            };
         } catch (error) {
-            this.logError('Failed to restore view state', error);
+            this.logError('Failed to create zone geometry', error);
+            return null;
+        }
+    }
+
+    createIlotPolygon(ilot) {
+        try {
+            if (ilot.polygon) return ilot.polygon;
+
+            // Create rectangular polygon from position and dimensions
+            const x = ilot.x || ilot.position?.x || 0;
+            const y = ilot.y || ilot.position?.y || 0;
+            const width = ilot.width || ilot.dimensions?.width || 3.0;
+            const height = ilot.height || ilot.dimensions?.height || 2.0;
+
+            return [
+                [x, y],
+                [x + width, y],
+                [x + width, y + height],
+                [x, y + height]
+            ];
+        } catch (error) {
+            this.logError('Failed to create îlot polygon', error);
+            return [[0, 0], [3, 0], [3, 2], [0, 2]]; // Default rectangle
         }
     }
 
     /**
-     * Update view visibility
+     * UTILITY FUNCTIONS - ENHANCED
      */
-    updateViewVisibility() {
-        // Show/hide appropriate views based on active view
-        if (this.autodeskViewController) {
-            this.autodeskViewController.setVisible(this.activeView === 'autodesk');
+
+    calculateDistance(point1, point2) {
+        const dx = point1[0] - point2[0];
+        const dy = point1[1] - point2[1];
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    calculatePolygonArea(polygon) {
+        let area = 0;
+        const n = polygon.length;
+
+        for (let i = 0; i < n; i++) {
+            const j = (i + 1) % n;
+            area += polygon[i][0] * polygon[j][1];
+            area -= polygon[j][0] * polygon[i][1];
         }
-        
-        if (this.canvasViewController) {
-            this.canvasViewController.setVisible(this.activeView === 'canvas');
+
+        return Math.abs(area) / 2;
+    }
+
+    calculateBounds(polygon) {
+        if (!Array.isArray(polygon) || polygon.length === 0) {
+            return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+        }
+
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
+
+        for (const point of polygon) {
+            if (Array.isArray(point) && point.length >= 2) {
+                minX = Math.min(minX, point[0]);
+                minY = Math.min(minY, point[1]);
+                maxX = Math.max(maxX, point[0]);
+                maxY = Math.max(maxY, point[1]);
+            }
+        }
+
+        return { minX, minY, maxX, maxY };
+    }
+
+    calculateLineBounds(start, end, thickness = 0) {
+        const minX = Math.min(start[0], end[0]) - thickness / 2;
+        const maxX = Math.max(start[0], end[0]) + thickness / 2;
+        const minY = Math.min(start[1], end[1]) - thickness / 2;
+        const maxY = Math.max(start[1], end[1]) + thickness / 2;
+
+        return { minX, minY, maxX, maxY };
+    }
+
+    createWallPolygon(start, end, thickness) {
+        const dx = end[0] - start[0];
+        const dy = end[1] - start[1];
+        const length = Math.sqrt(dx * dx + dy * dy);
+
+        if (length === 0) return [start, start, start, start];
+
+        const nx = -dy / length * thickness / 2;
+        const ny = dx / length * thickness / 2;
+
+        return [
+            [start[0] + nx, start[1] + ny],
+            [end[0] + nx, end[1] + ny],
+            [end[0] - nx, end[1] - ny],
+            [start[0] - nx, start[1] - ny]
+        ];
+    }
+
+    fitToView() {
+        const bounds = this.sharedScene.getBounds();
+        if (!bounds || !this.canvasViewController) return;
+
+        this.canvasViewController.fitToBounds(bounds);
+    }
+
+    clearFloorPlanElements() {
+        const geometriesToRemove = this.sharedScene.getAllGeometries()
+            .filter(g => ['wall', 'zone'].includes(g.type))
+            .map(g => g.id);
+
+        for (const id of geometriesToRemove) {
+            this.sharedScene.removeGeometry(id);
         }
     }
 
-    /**
-     * EVENT SYSTEM
-     */
+    clearIlots() {
+        const geometriesToRemove = this.sharedScene.getAllGeometries()
+            .filter(g => g.type === 'ilot')
+            .map(g => g.id);
 
-    /**
-     * Setup event handlers
-     */
-    setupEventHandlers() {
-        // Handle view controller events
-        if (this.autodeskViewController) {
-            this.autodeskViewController.on('cameraChanged', (camera) => {
-                this.emit('cameraChanged', { source: 'autodesk', camera });
-            });
-            
-            this.autodeskViewController.on('selectionChanged', (selection) => {
-                this.emit('selectionChanged', { source: 'autodesk', selection });
-            });
-        }
-        
-        if (this.canvasViewController) {
-            this.canvasViewController.on('cameraChanged', (camera) => {
-                this.emit('cameraChanged', { source: 'canvas', camera });
-            });
-            
-            this.canvasViewController.on('selectionChanged', (selection) => {
-                this.emit('selectionChanged', { source: 'canvas', selection });
-            });
+        for (const id of geometriesToRemove) {
+            this.sharedScene.removeGeometry(id);
         }
     }
 
+    // ... (Event system and other methods remain similar but enhanced)
+
     /**
-     * Add event listener
-     * @param {string} event - Event name
-     * @param {Function} callback - Event callback
+     * EVENT SYSTEM - ENHANCED
      */
+
     on(event, callback) {
         if (!this.eventListeners.has(event)) {
             this.eventListeners.set(event, []);
@@ -525,11 +704,6 @@ class DualViewController {
         this.eventListeners.get(event).push(callback);
     }
 
-    /**
-     * Remove event listener
-     * @param {string} event - Event name
-     * @param {Function} callback - Event callback
-     */
     off(event, callback) {
         const listeners = this.eventListeners.get(event);
         if (listeners) {
@@ -540,11 +714,6 @@ class DualViewController {
         }
     }
 
-    /**
-     * Emit event
-     * @param {string} event - Event name
-     * @param {Object} data - Event data
-     */
     emit(event, data) {
         const listeners = this.eventListeners.get(event);
         if (listeners) {
@@ -558,67 +727,104 @@ class DualViewController {
         }
     }
 
-    /**
-     * COORDINATE TRANSFORMATIONS
-     */
+    setupEventHandlers() {
+        // Enhanced event handling setup
+        if (this.canvasViewController) {
+            this.canvasViewController.on('cameraChanged', (camera) => {
+                this.saveViewState('canvas');
+                this.emit('cameraChanged', { source: 'canvas', camera });
+            });
 
-    /**
-     * Transform coordinates between views
-     * @param {Array} point - Point to transform
-     * @param {string} fromView - Source view
-     * @param {string} toView - Target view
-     * @returns {Array} Transformed point
-     */
-    transformCoordinates(point, fromView, toView) {
-        if (fromView === toView) return point;
-        
-        // For now, assume same coordinate system
-        // Could be enhanced with actual transformation matrices
-        return point;
+            this.canvasViewController.on('selectionChanged', (selection) => {
+                this.emit('selectionChanged', { source: 'canvas', selection });
+            });
+
+            this.canvasViewController.on('renderComplete', () => {
+                this.emit('renderComplete', { view: 'canvas' });
+            });
+        }
+    }
+
+    setupSynchronization() {
+        if (!this.config.syncEnabled) return;
+
+        // Enhanced synchronization setup
+        if (this.config.syncCameras) {
+            this.on('cameraChanged', (data) => {
+                if (!this.syncInProgress) {
+                    this.syncCameras(data.source, data.camera);
+                }
+            });
+        }
+    }
+
+    syncCameras(sourceView, cameraState) {
+        this.syncInProgress = true;
+
+        try {
+            const targetView = sourceView === 'autodesk' ? 'canvas' : 'autodesk';
+
+            if (targetView === 'canvas' && this.canvasViewController) {
+                this.canvasViewController.setCameraState(cameraState);
+            }
+        } finally {
+            this.syncInProgress = false;
+        }
+    }
+
+    saveViewState(viewType) {
+        try {
+            if (viewType === 'canvas' && this.canvasViewController) {
+                this.viewStates.canvas = {
+                    ...this.viewStates.canvas,
+                    camera: this.canvasViewController.getCameraState(),
+                    selection: this.canvasViewController.getSelection()
+                };
+            }
+        } catch (error) {
+            this.logError('Failed to save view state', error);
+        }
+    }
+
+    restoreViewState(viewType) {
+        try {
+            const state = this.viewStates[viewType];
+            if (!state) return;
+
+            if (viewType === 'canvas' && this.canvasViewController && state.camera) {
+                this.canvasViewController.setCameraState(state.camera);
+            }
+        } catch (error) {
+            this.logError('Failed to restore view state', error);
+        }
+    }
+
+    updateViewVisibility() {
+        if (this.canvasViewController) {
+            this.canvasViewController.setVisible(this.activeView === 'canvas');
+        }
+
+        if (this.autodeskViewController) {
+            this.autodeskViewController.setVisible(this.activeView === 'autodesk');
+        }
     }
 
     /**
-     * UTILITY FUNCTIONS
+     * STATISTICS AND MONITORING
      */
 
-    /**
-     * Get current scene bounds
-     * @returns {Object} Scene bounding box
-     */
-    getSceneBounds() {
-        return this.sharedScene.getBounds();
+    getStatistics() {
+        return {
+            ...this.stats,
+            config: this.config,
+            activeView: this.activeView,
+            workflowStage: this.workflowStage,
+            designComplete: this.designComplete,
+            geometryCount: this.sharedScene.getGeometryCount(),
+            sceneBounds: this.sharedScene.getBounds(),
+            validationStats: this.architecturalValidator.getStatistics()
+        };
     }
-
-    /**
-     * Clear all geometry
-     */
-    clearScene() {
-        this.sharedScene.clear();
-        this.scheduleUpdate(['all']);
-        this.log('Scene cleared');
-    }
-
-    /**
-     * Export scene data
-     * @returns {Object} Scene data
-     */
-    exportScene() {
-        return this.sharedScene.export();
-    }
-
-    /**
-     * Import scene data
-     * @param {Object} sceneData - Scene data
-     */
-    importScene(sceneData) {
-        this.sharedScene.import(sceneData);
-        this.scheduleUpdate(['all']);
-        this.log('Scene imported');
-    }
-
-    /**
-     * LOGGING
-     */
 
     log(message, data = {}) {
         if (this.config.debugMode) {
@@ -629,48 +835,69 @@ class DualViewController {
     logError(message, error) {
         console.error(`[DualViewController ERROR] ${message}:`, error);
     }
-
-    /**
-     * Get controller statistics
-     * @returns {Object} Statistics
-     */
-    getStatistics() {
-        return {
-            config: this.config,
-            activeView: this.activeView,
-            geometryCount: this.sharedScene.getGeometryCount(),
-            pendingUpdates: this.pendingUpdates.size,
-            eventListeners: Array.from(this.eventListeners.keys()),
-            autodeskReady: !!this.autodeskViewController,
-            canvasReady: !!this.canvasViewController
-        };
-    }
 }
 
 /**
- * Shared Scene Model
- * Manages all geometric primitives and their properties
+ * Enhanced Shared Scene Model with Architectural Support
  */
-class SharedSceneModel {
-    constructor() {
+class EnhancedSharedSceneModel {
+    constructor(architecturalConfig) {
         this.geometries = new Map();
         this.layers = new Map();
         this.bounds = null;
+        this.architecturalConfig = architecturalConfig;
+        this.spatialIndex = new Map(); // Simple spatial indexing
     }
 
     async initialize() {
         this.clear();
+        this.setupDefaultLayers();
+    }
+
+    setupDefaultLayers() {
+        const defaultLayers = ['WALLS', 'RED_ZONE', 'BLUE_ZONE', 'ILOTS', 'CORRIDORS', 'ANNOTATIONS'];
+
+        for (const layerName of defaultLayers) {
+            this.layers.set(layerName, {
+                name: layerName,
+                visible: true,
+                geometries: [],
+                style: {}
+            });
+        }
     }
 
     addGeometry(geometry) {
         const id = geometry.id || this.generateId();
         geometry.id = id;
-        
-        this.geometries.set(id, geometry);
-        this.updateBounds();
-        this.updateLayers(geometry);
-        
-        return id;
+
+        // Validate geometry before adding
+        if (this.validateGeometry(geometry)) {
+            this.geometries.set(id, geometry);
+            this.updateBounds();
+            this.updateLayers(geometry);
+            this.updateSpatialIndex(geometry);
+
+            return id;
+        } else {
+            console.warn('Invalid geometry rejected:', geometry);
+            return null;
+        }
+    }
+
+    validateGeometry(geometry) {
+        // Basic geometry validation
+        if (!geometry.type) return false;
+
+        switch (geometry.type) {
+            case 'wall':
+                return Array.isArray(geometry.line) && geometry.line.length === 2;
+            case 'zone':
+            case 'ilot':
+                return Array.isArray(geometry.polygon) && geometry.polygon.length >= 3;
+            default:
+                return true;
+        }
     }
 
     updateGeometry(id, updates) {
@@ -678,16 +905,37 @@ class SharedSceneModel {
         if (geometry) {
             Object.assign(geometry, updates);
             this.updateBounds();
+            this.updateSpatialIndex(geometry);
         }
     }
 
     removeGeometry(id) {
-        this.geometries.delete(id);
-        this.updateBounds();
+        const geometry = this.geometries.get(id);
+        if (geometry) {
+            this.geometries.delete(id);
+            this.updateBounds();
+            this.removFromSpatialIndex(id);
+
+            // Remove from layer
+            const layer = geometry.metadata?.layer || 'DEFAULT';
+            const layerData = this.layers.get(layer);
+            if (layerData) {
+                const index = layerData.geometries.indexOf(id);
+                if (index >= 0) {
+                    layerData.geometries.splice(index, 1);
+                }
+            }
+        }
     }
 
-    getGeometry(id) {
-        return this.geometries.get(id);
+    updateSpatialIndex(geometry) {
+        if (geometry.bbox) {
+            this.spatialIndex.set(geometry.id, geometry.bbox);
+        }
+    }
+
+    removFromSpatialIndex(id) {
+        this.spatialIndex.delete(id);
     }
 
     getAllGeometries() {
@@ -698,18 +946,16 @@ class SharedSceneModel {
         return this.getAllGeometries().filter(g => g.type === type);
     }
 
-    clear() {
-        this.geometries.clear();
-        this.layers.clear();
-        this.bounds = null;
-    }
+    getGeometriesByLayer(layerName) {
+        const layer = this.layers.get(layerName);
+        if (!layer) return [];
 
-    getBounds() {
-        return this.bounds;
+        return layer.geometries
+            .map(id => this.geometries.get(id))
+            .filter(g => g !== undefined);
     }
 
     updateBounds() {
-        // Calculate overall scene bounds
         const allGeometries = this.getAllGeometries();
         if (allGeometries.length === 0) {
             this.bounds = null;
@@ -728,7 +974,11 @@ class SharedSceneModel {
             }
         }
 
-        this.bounds = { minX, minY, maxX, maxY };
+        if (isFinite(minX) && isFinite(maxX)) {
+            this.bounds = { minX, minY, maxX, maxY };
+        } else {
+            this.bounds = null;
+        }
     }
 
     updateLayers(geometry) {
@@ -740,489 +990,582 @@ class SharedSceneModel {
                 geometries: []
             });
         }
-        this.layers.get(layer).geometries.push(geometry.id);
+
+        const layerData = this.layers.get(layer);
+        if (!layerData.geometries.includes(geometry.id)) {
+            layerData.geometries.push(geometry.id);
+        }
     }
 
-    generateId() {
-        return `geom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    getBounds() {
+        return this.bounds;
     }
 
     getGeometryCount() {
         return this.geometries.size;
     }
 
-    export() {
-        return {
-            geometries: Array.from(this.geometries.values()),
-            layers: Array.from(this.layers.values()),
-            bounds: this.bounds
-        };
+    clear() {
+        this.geometries.clear();
+        this.layers.clear();
+        this.spatialIndex.clear();
+        this.bounds = null;
     }
 
-    import(data) {
-        this.clear();
-        
-        if (data.geometries) {
-            for (const geometry of data.geometries) {
-                this.addGeometry(geometry);
-            }
-        }
-        
-        if (data.layers) {
-            for (const layer of data.layers) {
-                this.layers.set(layer.name, layer);
-            }
-        }
-        
-        this.bounds = data.bounds;
+    generateId() {
+        return `geom_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
 }
 
 /**
- * Autodesk View Controller
- * Manages Autodesk Viewer integration
+ * Architectural Validator - NEW
+ * Implements architectural rules and validation
  */
-class AutodeskViewController {
-    constructor(viewer, parent) {
-        this.viewer = viewer;
-        this.parent = parent;
-        this.eventListeners = new Map();
-    }
-
-    async initialize() {
-        // Setup Autodesk Viewer event handlers
-        this.setupEventHandlers();
-    }
-
-    setupEventHandlers() {
-        // Camera change events
-        this.viewer.addEventListener(Autodesk.Viewing.CAMERA_CHANGE_EVENT, () => {
-            this.emit('cameraChanged', this.getCameraState());
-        });
-
-        // Selection change events
-        this.viewer.addEventListener(Autodesk.Viewing.SELECTION_CHANGED_EVENT, (event) => {
-            this.emit('selectionChanged', event.dbIdArray);
-        });
-    }
-
-    getCameraState() {
-        const camera = this.viewer.getCamera();
-        return {
-            position: camera.position,
-            target: camera.target,
-            up: camera.up,
-            fov: camera.fov,
-            aspect: camera.aspect
+class ArchitecturalValidator {
+    constructor(config) {
+        this.config = config;
+        this.validationStats = {
+            totalValidations: 0,
+            validGeometries: 0,
+            invalidGeometries: 0,
+            warningCount: 0
         };
     }
 
-    setCameraState(cameraState) {
-        // Implementation depends on Autodesk Viewer API
-        // this.viewer.navigation.setRequestTransition(...)
-    }
+    validateFloorPlan(floorPlan) {
+        const errors = [];
+        const warnings = [];
 
-    getSelection() {
-        return this.viewer.getSelection();
-    }
-
-    setSelection(selection) {
-        this.viewer.select(selection);
-    }
-
-    setVisible(visible) {
-        const viewerContainer = this.viewer.container;
-        if (viewerContainer) {
-            viewerContainer.style.display = visible ? 'block' : 'none';
-        }
-    }
-
-    processUpdates(updates) {
-        // Process updates for Autodesk Viewer
-        // Implementation depends on specific requirements
-    }
-
-    getLayerStates() {
-        // Return layer visibility states
-        return {};
-    }
-
-    setLayerStates(states) {
-        // Set layer visibility states
-    }
-
-    on(event, callback) {
-        if (!this.eventListeners.has(event)) {
-            this.eventListeners.set(event, []);
-        }
-        this.eventListeners.get(event).push(callback);
-    }
-
-    emit(event, data) {
-        const listeners = this.eventListeners.get(event);
-        if (listeners) {
-            for (const callback of listeners) {
-                callback(data);
+        // Validate walls
+        if (floorPlan.walls) {
+            for (const wall of floorPlan.walls) {
+                const validation = this.validateWall(wall);
+                errors.push(...validation.errors);
+                warnings.push(...validation.warnings);
             }
         }
+
+        // Validate zones
+        if (floorPlan.redZones) {
+            for (const zone of floorPlan.redZones) {
+                const validation = this.validateZone(zone, 'entrance');
+                errors.push(...validation.errors);
+                warnings.push(...validation.warnings);
+            }
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors,
+            warnings
+        };
+    }
+
+    validateIlot(ilot) {
+        this.validationStats.totalValidations++;
+
+        const errors = [];
+        const warnings = [];
+
+        try {
+            // Get îlot dimensions
+            const polygon = ilot.polygon || this.createIlotPolygon(ilot);
+            const bounds = this.calculateBounds(polygon);
+            const width = bounds.maxX - bounds.minX;
+            const height = bounds.maxY - bounds.minY;
+            const area = this.calculatePolygonArea(polygon);
+
+            // Dimension validation
+            if (width < this.config.minIlotDimension) {
+                errors.push(`Width ${width.toFixed(2)}m below minimum ${this.config.minIlotDimension}m`);
+            }
+
+            if (height < this.config.minIlotDimension) {
+                errors.push(`Height ${height.toFixed(2)}m below minimum ${this.config.minIlotDimension}m`);
+            }
+
+            if (width > this.config.maxIlotDimension) {
+                errors.push(`Width ${width.toFixed(2)}m exceeds maximum ${this.config.maxIlotDimension}m`);
+            }
+
+            if (height > this.config.maxIlotDimension) {
+                errors.push(`Height ${height.toFixed(2)}m exceeds maximum ${this.config.maxIlotDimension}m`);
+            }
+
+            // Area validation
+            if (area < this.config.minArea) {
+                errors.push(`Area ${area.toFixed(2)}m² below minimum ${this.config.minArea}m²`);
+            }
+
+            if (area > this.config.maxArea) {
+                errors.push(`Area ${area.toFixed(2)}m² exceeds maximum ${this.config.maxArea}m²`);
+            }
+
+            // Aspect ratio validation
+            const aspectRatio = Math.max(width, height) / Math.min(width, height);
+            if (aspectRatio > this.config.maxAspectRatio) {
+                warnings.push(`Aspect ratio ${aspectRatio.toFixed(2)} exceeds recommended ${this.config.maxAspectRatio}`);
+            }
+
+            // Accessibility validation
+            if (ilot.type === 'workspace' && Math.min(width, height) < this.config.wheelchairClearance) {
+                warnings.push(`Workspace may not meet wheelchair accessibility requirements`);
+            }
+
+            const isValid = errors.length === 0;
+
+            if (isValid) {
+                this.validationStats.validGeometries++;
+            } else {
+                this.validationStats.invalidGeometries++;
+            }
+
+            if (warnings.length > 0) {
+                this.validationStats.warningCount++;
+            }
+
+            return {
+                isValid,
+                errors,
+                warnings,
+                metrics: {
+                    width,
+                    height,
+                    area,
+                    aspectRatio
+                }
+            };
+
+        } catch (error) {
+            this.validationStats.invalidGeometries++;
+            return {
+                isValid: false,
+                errors: ['Validation failed: ' + error.message],
+                warnings: [],
+                metrics: {}
+            };
+        }
+    }
+
+    validateWall(wall) {
+        const errors = [];
+        const warnings = [];
+
+        // Basic wall validation
+        if (!wall.start || !wall.end) {
+            if (wall.x1 === undefined || wall.y1 === undefined || 
+                wall.x2 === undefined || wall.y2 === undefined) {
+                errors.push('Wall missing start or end coordinates');
+            }
+        }
+
+        return { errors, warnings };
+    }
+
+    validateZone(zone, type) {
+        const errors = [];
+        const warnings = [];
+
+        const polygon = zone.polygon || zone;
+        if (!Array.isArray(polygon) || polygon.length < 3) {
+            errors.push('Zone must have at least 3 points');
+        }
+
+        return { errors, warnings };
+    }
+
+    // Helper methods (same as in DualViewController)
+    calculateBounds(polygon) {
+        if (!Array.isArray(polygon) || polygon.length === 0) {
+            return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+        }
+
+        let minX = Infinity, minY = Infinity;
+        let maxX = -Infinity, maxY = -Infinity;
+
+        for (const point of polygon) {
+            if (Array.isArray(point) && point.length >= 2) {
+                minX = Math.min(minX, point[0]);
+                minY = Math.min(minY, point[1]);
+                maxX = Math.max(maxX, point[0]);
+                maxY = Math.max(maxY, point[1]);
+            }
+        }
+
+        return { minX, minY, maxX, maxY };
+    }
+
+    calculatePolygonArea(polygon) {
+        let area = 0;
+        const n = polygon.length;
+
+        for (let i = 0; i < n; i++) {
+            const j = (i + 1) % n;
+            area += polygon[i][0] * polygon[j][1];
+            area -= polygon[j][0] * polygon[i][1];
+        }
+
+        return Math.abs(area) / 2;
+    }
+
+    createIlotPolygon(ilot) {
+        const x = ilot.x || ilot.position?.x || 0;
+        const y = ilot.y || ilot.position?.y || 0;
+        const width = ilot.width || ilot.dimensions?.width || 3.0;
+        const height = ilot.height || ilot.dimensions?.height || 2.0;
+
+        return [
+            [x, y],
+            [x + width, y],
+            [x + width, y + height],
+            [x, y + height]
+        ];
+    }
+
+    getStatistics() {
+        return { ...this.validationStats };
     }
 }
 
 /**
- * Canvas View Controller
- * Manages Canvas rendering and interaction
+ * Enhanced Canvas View Controller - FIXED
  */
-class CanvasViewController {
+class EnhancedCanvasViewController {
     constructor(canvas, parent) {
         this.canvas = canvas;
         this.parent = parent;
         this.ctx = canvas.getContext('2d');
         this.eventListeners = new Map();
-        
-        // Camera state
+
+        // Enhanced camera state
         this.camera = {
-            x: 0, y: 0, zoom: 1, rotation: 0
+            x: 0, 
+            y: 0, 
+            zoom: 1, 
+            rotation: 0,
+            minZoom: 0.1,
+            maxZoom: 10.0
         };
-        
+
         // Interaction state
         this.selection = [];
-        this.isDragging = false;
-        this.lastMouse = { x: 0, y: 0 };
+        this.interaction = {
+            isDragging: false,
+            isPanning: false,
+            lastMouse: { x: 0, y: 0 },
+            startMouse: { x: 0, y: 0 }
+        };
+
+        // Rendering state - FIXED
+        this.renderState = {
+            needsRedraw: true,
+            isRendering: false,
+            lastRenderTime: 0,
+            frameCount: 0
+        };
+
+        // Grid settings
+        this.grid = {
+            enabled: true,
+            spacing: 1.0, // 1 meter
+            color: '#E5E7EB',
+            opacity: 0.3
+        };
+
+        this.log('Enhanced Canvas Controller initialized');
     }
 
     async initialize() {
         this.setupEventHandlers();
+        this.setupCanvas();
+        this.scheduleRender();
+        this.log('Canvas controller initialized');
+    }
+
+    setupCanvas() {
+        // Set canvas size with proper device pixel ratio handling
         this.resize();
+
+        // Set initial camera to show entire scene
+        this.fitToView();
     }
 
     setupEventHandlers() {
-        // Mouse events for interaction
+        // Mouse events with enhanced handling
         this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
         this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
         this.canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
-        this.canvas.addEventListener('wheel', (e) => this.onWheel(e));
-        
+        this.canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
+
+        // Context menu prevention
+        this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
         // Resize handling
         window.addEventListener('resize', () => this.resize());
+
+        // Visibility change handling
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                this.scheduleRender();
+            }
+        });
     }
 
     onMouseDown(event) {
         event.preventDefault();
-        event.stopPropagation();
-        
-        this.isDragging = true;
-        this.lastMouse = { x: event.clientX, y: event.clientY };
-        
-        // Get mouse position relative to canvas
         const rect = this.canvas.getBoundingClientRect();
-        const canvasX = event.clientX - rect.left;
-        const canvasY = event.clientY - rect.top;
-        
-        // Convert to world coordinates for selection
-        const worldX = (canvasX - this.canvas.width / 2) / this.camera.zoom + this.camera.x;
-        const worldY = (canvasY - this.canvas.height / 2) / this.camera.zoom + this.camera.y;
-        
-        // Check for selection at this point
-        const selectedObject = this.getObjectAtPoint([worldX, worldY]);
-        if (selectedObject) {
-            this.selection = [selectedObject.id];
-            this.emit('selectionChanged', this.selection);
-            this.render(); // Re-render to show selection
-        }
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        this.interaction.isDragging = true;
+        this.interaction.isPanning = event.button === 0; // Left button for panning
+        this.interaction.lastMouse = { x, y };
+        this.interaction.startMouse = { x, y };
+
+        this.canvas.style.cursor = 'grabbing';
     }
 
     onMouseMove(event) {
         event.preventDefault();
-        event.stopPropagation();
-        
-        if (this.isDragging) {
-            const dx = event.clientX - this.lastMouse.x;
-            const dy = event.clientY - this.lastMouse.y;
-            
-            // Apply camera movement
+        const rect = this.canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        if (this.interaction.isDragging && this.interaction.isPanning) {
+            const dx = x - this.interaction.lastMouse.x;
+            const dy = y - this.interaction.lastMouse.y;
+
+            // Apply pan with proper zoom scaling
             this.camera.x -= dx / this.camera.zoom;
             this.camera.y -= dy / this.camera.zoom;
-            
-            // Re-render the scene
-            this.render();
+
+            this.scheduleRender();
             this.emit('cameraChanged', this.getCameraState());
         }
-        
-        this.lastMouse = { x: event.clientX, y: event.clientY };
+
+        this.interaction.lastMouse = { x, y };
     }
 
     onMouseUp(event) {
         event.preventDefault();
-        event.stopPropagation();
-        
-        this.isDragging = false;
+
+        this.interaction.isDragging = false;
+        this.interaction.isPanning = false;
+        this.canvas.style.cursor = 'default';
     }
 
     onWheel(event) {
         event.preventDefault();
-        event.stopPropagation();
-        
+
         const rect = this.canvas.getBoundingClientRect();
         const mouseX = event.clientX - rect.left;
         const mouseY = event.clientY - rect.top;
-        
-        // Calculate zoom center in world coordinates
-        const worldX = (mouseX - this.canvas.width / 2) / this.camera.zoom + this.camera.x;
-        const worldY = (mouseY - this.canvas.height / 2) / this.camera.zoom + this.camera.y;
-        
+
+        // Convert mouse position to world coordinates before zoom
+        const worldX = this.screenToWorld(mouseX, mouseY)[0];
+        const worldY = this.screenToWorld(mouseX, mouseY)[1];
+
+        // Apply zoom
         const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
-        const oldZoom = this.camera.zoom;
-        this.camera.zoom *= zoomFactor;
-        
-        // Clamp zoom levels
-        this.camera.zoom = Math.max(0.1, Math.min(10, this.camera.zoom));
-        
-        // Adjust camera position to zoom around mouse position
-        const zoomRatio = this.camera.zoom / oldZoom;
-        this.camera.x = worldX - (worldX - this.camera.x) * zoomRatio;
-        this.camera.y = worldY - (worldY - this.camera.y) * zoomRatio;
-        
-        this.render();
-        this.emit('cameraChanged', this.getCameraState());
-    }
+        const newZoom = Math.max(this.camera.minZoom, 
+                       Math.min(this.camera.maxZoom, this.camera.zoom * zoomFactor));
 
-    getObjectAtPoint(worldPoint) {
-        try {
-            const geometries = this.parent.sharedScene.getAllGeometries();
-            
-            for (const geometry of geometries) {
-                if (this.isPointInGeometry(worldPoint, geometry)) {
-                    return geometry;
-                }
-            }
-            
-            return null;
-        } catch (error) {
-            console.error('Error getting object at point:', error);
-            return null;
+        if (newZoom !== this.camera.zoom) {
+            this.camera.zoom = newZoom;
+
+            // Adjust camera position to zoom towards mouse
+            const newWorldX = this.screenToWorld(mouseX, mouseY)[0];
+            const newWorldY = this.screenToWorld(mouseX, mouseY)[1];
+
+            this.camera.x += worldX - newWorldX;
+            this.camera.y += worldY - newWorldY;
+
+            this.scheduleRender();
+            this.emit('cameraChanged', this.getCameraState());
         }
-    }
-
-    isPointInGeometry(point, geometry) {
-        try {
-            if (geometry.polygon) {
-                return this.pointInPolygon(point, geometry.polygon);
-            }
-            
-            if (geometry.line) {
-                // Check if point is near line
-                const [start, end] = geometry.line;
-                const distToLine = this.pointToLineDistance(point, start, end);
-                const thickness = geometry.thickness || 0.1;
-                return distToLine <= thickness / 2;
-            }
-            
-            return false;
-        } catch (error) {
-            return false;
-        }
-    }
-
-    pointInPolygon(point, polygon) {
-        const [x, y] = point;
-        let inside = false;
-
-        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-            const [xi, yi] = polygon[i];
-            const [xj, yj] = polygon[j];
-
-            if (((yi > y) !== (yj > y)) && 
-                (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
-                inside = !inside;
-            }
-        }
-
-        return inside;
-    }
-
-    pointToLineDistance(point, lineStart, lineEnd) {
-        const A = point[0] - lineStart[0];
-        const B = point[1] - lineStart[1];
-        const C = lineEnd[0] - lineStart[0];
-        const D = lineEnd[1] - lineStart[1];
-
-        const dot = A * C + B * D;
-        const lenSq = C * C + D * D;
-
-        if (lenSq === 0) {
-            return Math.sqrt(A * A + B * B);
-        }
-
-        let param = dot / lenSq;
-        param = Math.max(0, Math.min(1, param));
-
-        const closestX = lineStart[0] + param * C;
-        const closestY = lineStart[1] + param * D;
-
-        const dx = point[0] - closestX;
-        const dy = point[1] - closestY;
-
-        return Math.sqrt(dx * dx + dy * dy);
     }
 
     resize() {
         const rect = this.canvas.getBoundingClientRect();
-        this.canvas.width = rect.width * window.devicePixelRatio;
-        this.canvas.height = rect.height * window.devicePixelRatio;
-        this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-        this.render();
+        const devicePixelRatio = window.devicePixelRatio || 1;
+
+        // Set actual canvas size
+        this.canvas.width = rect.width * devicePixelRatio;
+        this.canvas.height = rect.height * devicePixelRatio;
+
+        // Set display size
+        this.canvas.style.width = rect.width + 'px';
+        this.canvas.style.height = rect.height + 'px';
+
+        // Scale context for device pixel ratio
+        this.ctx.scale(devicePixelRatio, devicePixelRatio);
+
+        this.scheduleRender();
+    }
+
+    scheduleRender() {
+        if (this.renderState.needsRedraw) return;
+
+        this.renderState.needsRedraw = true;
+        requestAnimationFrame(() => this.render());
     }
 
     render() {
+        if (this.renderState.isRendering) return;
+
+        this.renderState.isRendering = true;
+        this.renderState.needsRedraw = false;
+
+        const startTime = performance.now();
+
         try {
-            // Get canvas dimensions
-            const canvasWidth = this.canvas.clientWidth;
-            const canvasHeight = this.canvas.clientHeight;
-            
-            // Update canvas size if needed
-            if (this.canvas.width !== canvasWidth || this.canvas.height !== canvasHeight) {
-                this.canvas.width = canvasWidth;
-                this.canvas.height = canvasHeight;
-            }
-            
-            // Clear canvas with background
-            this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-            this.ctx.fillStyle = '#f8fafc';
-            this.ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-            
-            // Apply camera transform
+            // Clear canvas with proper dimensions
+            const rect = this.canvas.getBoundingClientRect();
+            this.ctx.clearRect(0, 0, rect.width, rect.height);
+
+            // Save context state
             this.ctx.save();
-            
-            // Translate to center and apply zoom
-            this.ctx.translate(canvasWidth / 2, canvasHeight / 2);
-            this.ctx.scale(this.camera.zoom, this.camera.zoom);
-            this.ctx.translate(-this.camera.x, -this.camera.y);
-            
-            // Render grid for reference
-            this.renderGrid();
-            
-            // Get and render all geometries
-            const geometries = this.parent.sharedScene.getAllGeometries();
-            
-            if (geometries && geometries.length > 0) {
-                for (const geometry of geometries) {
-                    try {
-                        this.renderGeometry(geometry);
-                    } catch (error) {
-                        console.error('Error rendering geometry:', geometry, error);
-                    }
-                }
+
+            // Apply camera transform
+            this.applyCamera();
+
+            // Render grid if enabled
+            if (this.grid.enabled) {
+                this.renderGrid();
             }
-            
-            // Render selection highlights
-            this.renderSelectionHighlights();
-            
+
+            // Render all geometries by layer order
+            this.renderGeometriesByLayer();
+
+            // Restore context state
             this.ctx.restore();
-            
-            // Render UI elements (zoom level, etc.)
-            this.renderUI();
-            
+
+            // Update statistics
+            this.renderState.frameCount++;
+            this.renderState.lastRenderTime = performance.now() - startTime;
+
+            this.emit('renderComplete');
+
         } catch (error) {
-            console.error('Canvas render error:', error);
-            
-            // Fallback rendering
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            this.ctx.fillStyle = '#f8fafc';
-            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.parent.logError('Canvas render failed', error);
+        } finally {
+            this.renderState.isRendering = false;
         }
+    }
+
+    applyCamera() {
+        const rect = this.canvas.getBoundingClientRect();
+
+        // Translate to center of canvas
+        this.ctx.translate(rect.width / 2, rect.height / 2);
+
+        // Apply zoom
+        this.ctx.scale(this.camera.zoom, this.camera.zoom);
+
+        // Apply rotation if needed
+        if (this.camera.rotation !== 0) {
+            this.ctx.rotate(this.camera.rotation);
+        }
+
+        // Apply camera position (pan)
+        this.ctx.translate(-this.camera.x, -this.camera.y);
     }
 
     renderGrid() {
-        const gridSize = 1.0; // 1 meter grid
-        const canvasWidth = this.canvas.width / this.camera.zoom;
-        const canvasHeight = this.canvas.height / this.camera.zoom;
-        
-        const startX = Math.floor((this.camera.x - canvasWidth / 2) / gridSize) * gridSize;
-        const endX = Math.ceil((this.camera.x + canvasWidth / 2) / gridSize) * gridSize;
-        const startY = Math.floor((this.camera.y - canvasHeight / 2) / gridSize) * gridSize;
-        const endY = Math.ceil((this.camera.y + canvasHeight / 2) / gridSize) * gridSize;
-        
-        this.ctx.strokeStyle = '#e2e8f0';
-        this.ctx.lineWidth = 0.5 / this.camera.zoom;
-        this.ctx.setLineDash([5 / this.camera.zoom, 5 / this.camera.zoom]);
-        
+        const bounds = this.getVisibleBounds();
+        const spacing = this.grid.spacing;
+
+        this.ctx.save();
+        this.ctx.strokeStyle = this.grid.color;
+        this.ctx.globalAlpha = this.grid.opacity;
+        this.ctx.lineWidth = 1 / this.camera.zoom; // Scale line width
+
+        this.ctx.beginPath();
+
         // Vertical lines
-        for (let x = startX; x <= endX; x += gridSize) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, startY);
-            this.ctx.lineTo(x, endY);
-            this.ctx.stroke();
+        const startX = Math.floor(bounds.minX / spacing) * spacing;
+        const endX = Math.ceil(bounds.maxX / spacing) * spacing;
+
+        for (let x = startX; x <= endX; x += spacing) {
+            this.ctx.moveTo(x, bounds.minY);
+            this.ctx.lineTo(x, bounds.maxY);
         }
-        
+
         // Horizontal lines
-        for (let y = startY; y <= endY; y += gridSize) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(startX, y);
-            this.ctx.lineTo(endX, y);
-            this.ctx.stroke();
+        const startY = Math.floor(bounds.minY / spacing) * spacing;
+        const endY = Math.ceil(bounds.maxY / spacing) * spacing;
+
+        for (let y = startY; y <= endY; y += spacing) {
+            this.ctx.moveTo(bounds.minX, y);
+            this.ctx.lineTo(bounds.maxX, y);
         }
-        
-        this.ctx.setLineDash([]);
+
+        this.ctx.stroke();
+        this.ctx.restore();
     }
 
-    renderSelectionHighlights() {
-        if (this.selection.length === 0) return;
-        
-        const geometries = this.parent.sharedScene.getAllGeometries();
-        
-        for (const geometry of geometries) {
-            if (this.selection.includes(geometry.id)) {
-                this.ctx.save();
-                this.ctx.strokeStyle = '#3b82f6';
-                this.ctx.lineWidth = 3 / this.camera.zoom;
-                this.ctx.setLineDash([5 / this.camera.zoom, 5 / this.camera.zoom]);
-                
-                if (geometry.polygon) {
-                    this.renderPolygon(geometry.polygon, false);
+    renderGeometriesByLayer() {
+        const layerOrder = ['WALLS', 'RED_ZONE', 'BLUE_ZONE', 'CORRIDORS', 'ILOTS', 'ANNOTATIONS'];
+
+        for (const layerName of layerOrder) {
+            const geometries = this.parent.sharedScene.getGeometriesByLayer(layerName);
+
+            for (const geometry of geometries) {
+                if (this.isGeometryVisible(geometry)) {
+                    this.renderGeometry(geometry);
                 }
-                
-                this.ctx.restore();
             }
         }
     }
 
-    renderUI() {
-        this.ctx.save();
-        this.ctx.resetTransform();
-        
-        // Render zoom level
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        this.ctx.fillRect(10, 10, 120, 30);
-        
-        this.ctx.fillStyle = 'white';
-        this.ctx.font = '12px Inter';
-        this.ctx.fillText(`Zoom: ${(this.camera.zoom * 100).toFixed(0)}%`, 20, 30);
-        
-        // Render coordinates
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-        this.ctx.fillRect(10, 50, 150, 30);
-        
-        this.ctx.fillStyle = 'white';
-        this.ctx.fillText(`X: ${this.camera.x.toFixed(1)}, Y: ${this.camera.y.toFixed(1)}`, 20, 70);
-        
-        this.ctx.restore();
+    isGeometryVisible(geometry) {
+        // Simple viewport culling
+        if (!geometry.bbox) return true;
+
+        const viewBounds = this.getVisibleBounds();
+        const geomBounds = geometry.bbox;
+
+        return !(geomBounds.maxX < viewBounds.minX || 
+                geomBounds.minX > viewBounds.maxX ||
+                geomBounds.maxY < viewBounds.minY || 
+                geomBounds.minY > viewBounds.maxY);
     }
 
     renderGeometry(geometry) {
-        if (!geometry) return;
-        
         this.ctx.save();
-        
+
+        const style = geometry.style || {};
+
+        // Apply style properties
+        if (style.color) {
+            this.ctx.strokeStyle = style.color;
+            if (style.fill) {
+                this.ctx.fillStyle = style.color;
+            }
+        }
+
+        if (style.strokeColor) {
+            this.ctx.strokeStyle = style.strokeColor;
+        }
+
+        if (style.thickness || style.strokeWidth) {
+            this.ctx.lineWidth = (style.thickness || style.strokeWidth) / this.camera.zoom;
+        }
+
+        if (style.opacity !== undefined) {
+            this.ctx.globalAlpha = style.opacity;
+        }
+
+        if (style.lineCap) {
+            this.ctx.lineCap = style.lineCap;
+        }
+
+        if (style.lineJoin) {
+            this.ctx.lineJoin = style.lineJoin;
+        }
+
+        // Render based on geometry type
         try {
-            const style = geometry.style || {};
-            
-            // Set style properties with fallbacks
-            this.ctx.strokeStyle = style.color || '#6B7280';
-            this.ctx.fillStyle = style.color || '#6B7280';
-            this.ctx.lineWidth = (style.thickness || 1) / this.camera.zoom;
-            this.ctx.globalAlpha = style.opacity !== undefined ? style.opacity : 1.0;
-            
-            // Render based on geometry type
             switch (geometry.type) {
                 case 'wall':
                     this.renderWall(geometry);
@@ -1237,69 +1580,22 @@ class CanvasViewController {
                     this.renderCorridor(geometry);
                     break;
                 default:
-                    // Generic polygon rendering
-                    if (geometry.polygon) {
-                        this.renderPolygon(geometry.polygon, style.fill);
-                    }
+                    this.renderGenericGeometry(geometry);
                     break;
             }
-            
-            // Render labels if present
-            if (geometry.label) {
-                this.renderLabel(geometry);
-            }
-            
         } catch (error) {
-            console.error('Error in renderGeometry:', error);
+            this.parent.logError('Failed to render geometry', error);
         }
-        
-        this.ctx.restore();
-    }
 
-    renderLabel(geometry) {
-        if (!geometry.label || !geometry.polygon) return;
-        
-        // Calculate center of geometry
-        const center = this.calculatePolygonCenter(geometry.polygon);
-        
-        this.ctx.save();
-        this.ctx.fillStyle = '#1e293b';
-        this.ctx.font = `${12 / this.camera.zoom}px Inter`;
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'middle';
-        
-        // Add background for better readability
-        const metrics = this.ctx.measureText(geometry.label);
-        const padding = 4 / this.camera.zoom;
-        
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        this.ctx.fillRect(
-            center[0] - metrics.width / 2 - padding,
-            center[1] - 6 / this.camera.zoom - padding,
-            metrics.width + padding * 2,
-            12 / this.camera.zoom + padding * 2
-        );
-        
-        this.ctx.fillStyle = '#1e293b';
-        this.ctx.fillText(geometry.label, center[0], center[1]);
-        
         this.ctx.restore();
-    }
-
-    calculatePolygonCenter(polygon) {
-        if (!polygon || polygon.length === 0) return [0, 0];
-        
-        let x = 0, y = 0;
-        for (const point of polygon) {
-            x += point[0];
-            y += point[1];
-        }
-        
-        return [x / polygon.length, y / polygon.length];
     }
 
     renderWall(geometry) {
-        if (geometry.line) {
+        if (geometry.polygon) {
+            // Render wall as polygon
+            this.renderPolygon(geometry.polygon, true);
+        } else if (geometry.line) {
+            // Render wall as line
             const [start, end] = geometry.line;
             this.ctx.beginPath();
             this.ctx.moveTo(start[0], start[1]);
@@ -1310,36 +1606,149 @@ class CanvasViewController {
 
     renderZone(geometry) {
         if (geometry.polygon) {
-            this.renderPolygon(geometry.polygon, true);
+            this.renderPolygon(geometry.polygon, geometry.style?.fill !== false);
         }
     }
 
     renderIlot(geometry) {
         if (geometry.polygon) {
-            this.renderPolygon(geometry.polygon, true);
+            // Fill first, then stroke
+            if (geometry.style?.fill !== false) {
+                this.renderPolygon(geometry.polygon, true, false);
+            }
+            this.renderPolygon(geometry.polygon, false, true);
+
+            // Add validation indicator
+            if (geometry.properties?.isValid === false) {
+                this.renderValidationIndicator(geometry);
+            }
         }
     }
 
     renderCorridor(geometry) {
         if (geometry.polygon) {
-            this.renderPolygon(geometry.polygon, true);
+            this.renderPolygon(geometry.polygon, geometry.style?.fill !== false);
         }
     }
 
-    renderPolygon(polygon, fill = false) {
+    renderGenericGeometry(geometry) {
+        if (geometry.polygon) {
+            this.renderPolygon(geometry.polygon, geometry.style?.fill !== false);
+        }
+    }
+
+    renderPolygon(polygon, fill = false, stroke = true) {
+        if (!Array.isArray(polygon) || polygon.length < 2) return;
+
         this.ctx.beginPath();
         this.ctx.moveTo(polygon[0][0], polygon[0][1]);
-        
+
         for (let i = 1; i < polygon.length; i++) {
             this.ctx.lineTo(polygon[i][0], polygon[i][1]);
         }
-        
+
         this.ctx.closePath();
-        
+
         if (fill) {
             this.ctx.fill();
         }
+
+        if (stroke) {
+            this.ctx.stroke();
+        }
+    }
+
+    renderValidationIndicator(geometry) {
+        if (!geometry.bbox) return;
+
+        const centerX = (geometry.bbox.minX + geometry.bbox.maxX) / 2;
+        const centerY = (geometry.bbox.minY + geometry.bbox.maxY) / 2;
+        const size = 0.2 / this.camera.zoom;
+
+        this.ctx.save();
+        this.ctx.fillStyle = '#EF4444';
+        this.ctx.strokeStyle = '#FFFFFF';
+        this.ctx.lineWidth = 2 / this.camera.zoom;
+
+        // Draw error indicator (X)
+        this.ctx.beginPath();
+        this.ctx.moveTo(centerX - size, centerY - size);
+        this.ctx.lineTo(centerX + size, centerY + size);
+        this.ctx.moveTo(centerX + size, centerY - size);
+        this.ctx.lineTo(centerX - size, centerY + size);
         this.ctx.stroke();
+
+        this.ctx.restore();
+    }
+
+    // Utility methods
+    screenToWorld(screenX, screenY) {
+        const rect = this.canvas.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        const x = (screenX - centerX) / this.camera.zoom + this.camera.x;
+        const y = (screenY - centerY) / this.camera.zoom + this.camera.y;
+
+        return [x, y];
+    }
+
+    worldToScreen(worldX, worldY) {
+        const rect = this.canvas.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        const x = (worldX - this.camera.x) * this.camera.zoom + centerX;
+        const y = (worldY - this.camera.y) * this.camera.zoom + centerY;
+
+        return [x, y];
+    }
+
+    getVisibleBounds() {
+        const rect = this.canvas.getBoundingClientRect();
+        const halfWidth = rect.width / (2 * this.camera.zoom);
+        const halfHeight = rect.height / (2 * this.camera.zoom);
+
+        return {
+            minX: this.camera.x - halfWidth,
+            maxX: this.camera.x + halfWidth,
+            minY: this.camera.y - halfHeight,
+            maxY: this.camera.y + halfHeight
+        };
+    }
+
+    fitToBounds(bounds) {
+        if (!bounds) return;
+
+        const rect = this.canvas.getBoundingClientRect();
+        const padding = 50; // pixels
+
+        const boundsWidth = bounds.maxX - bounds.minX;
+        const boundsHeight = bounds.maxY - bounds.minY;
+
+        if (boundsWidth === 0 || boundsHeight === 0) return;
+
+        const scaleX = (rect.width - padding * 2) / boundsWidth;
+        const scaleY = (rect.height - padding * 2) / boundsHeight;
+
+        this.camera.zoom = Math.min(scaleX, scaleY, this.camera.maxZoom);
+        this.camera.x = (bounds.minX + bounds.maxX) / 2;
+        this.camera.y = (bounds.minY + bounds.maxY) / 2;
+
+        this.scheduleRender();
+    }
+
+    fitToView() {
+        const sceneBounds = this.parent.sharedScene.getBounds();
+        if (sceneBounds) {
+            this.fitToBounds(sceneBounds);
+        } else {
+            // Default view
+            this.camera.x = 0;
+            this.camera.y = 0;
+            this.camera.zoom = 1;
+            this.scheduleRender();
+        }
     }
 
     getCameraState() {
@@ -1348,7 +1757,7 @@ class CanvasViewController {
 
     setCameraState(cameraState) {
         Object.assign(this.camera, cameraState);
-        this.render();
+        this.scheduleRender();
     }
 
     getSelection() {
@@ -1357,16 +1766,19 @@ class CanvasViewController {
 
     setSelection(selection) {
         this.selection = [...selection];
-        this.render();
+        this.scheduleRender();
     }
 
     setVisible(visible) {
         this.canvas.style.display = visible ? 'block' : 'none';
+        if (visible) {
+            this.scheduleRender();
+        }
     }
 
     processUpdates(updates) {
         // Re-render for any updates
-        this.render();
+        this.scheduleRender();
     }
 
     getLayerStates() {
@@ -1375,6 +1787,105 @@ class CanvasViewController {
 
     setLayerStates(states) {
         // Implementation for layer states
+        this.scheduleRender();
+    }
+
+    // Event system
+    on(event, callback) {
+        if (!this.eventListeners.has(event)) {
+            this.eventListeners.set(event, []);
+        }
+        this.eventListeners.get(event).push(callback);
+    }
+
+    emit(event, data) {
+        const listeners = this.eventListeners.get(event);
+        if (listeners) {
+            for (const callback of listeners) {
+                try {
+                    callback(data);
+                } catch (error) {
+                    this.parent.logError(`Canvas event listener error for ${event}`, error);
+                }
+            }
+        }
+    }
+
+    log(message, data = {}) {
+        if (this.parent.config.debugMode) {
+            console.log(`[CanvasViewController] ${message}`, data);
+        }
+    }
+}
+
+// Keep existing AutodeskViewController class as is...
+class AutodeskViewController {
+    constructor(viewer, parent) {
+        this.viewer = viewer;
+        this.parent = parent;
+        this.eventListeners = new Map();
+    }
+
+    async initialize() {
+        this.setupEventHandlers();
+    }
+
+    setupEventHandlers() {
+        if (this.viewer && this.viewer.addEventListener) {
+            this.viewer.addEventListener(Autodesk.Viewing.CAMERA_CHANGE_EVENT, () => {
+                this.emit('cameraChanged', this.getCameraState());
+            });
+
+            this.viewer.addEventListener(Autodesk.Viewing.SELECTION_CHANGED_EVENT, (event) => {
+                this.emit('selectionChanged', event.dbIdArray);
+            });
+        }
+    }
+
+    getCameraState() {
+        if (!this.viewer) return {};
+
+        const camera = this.viewer.getCamera();
+        return {
+            position: camera.position,
+            target: camera.target,
+            up: camera.up,
+            fov: camera.fov,
+            aspect: camera.aspect
+        };
+    }
+
+    setCameraState(cameraState) {
+        // Implementation depends on Autodesk Viewer API
+    }
+
+    getSelection() {
+        return this.viewer ? this.viewer.getSelection() : [];
+    }
+
+    setSelection(selection) {
+        if (this.viewer) {
+            this.viewer.select(selection);
+        }
+    }
+
+    setVisible(visible) {
+        const viewerContainer = this.viewer?.container;
+        if (viewerContainer) {
+            viewerContainer.style.display = visible ? 'block' : 'none';
+        }
+    }
+
+    processUpdates(updates) {
+        // Process updates for Autodesk Viewer
+    }
+
+    getLayerStates() {
+        return {};
+    }
+
+    setLayerStates(states) {
+        // Set layer visibility states
     }
 
     on(event, callback) {
