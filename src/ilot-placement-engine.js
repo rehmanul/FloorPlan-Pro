@@ -270,6 +270,68 @@ class IlotPlacementEngine {
     }
 
     /**
+     * Calculate allowed placement zones by subtracting restricted areas from total area
+     */
+    calculateAllowedZones() {
+        try {
+            this.log('Calculating allowed placement zones');
+            
+            // Get the floor plan boundary
+            let boundary = this.floorPlan.boundary;
+            
+            // If no boundary exists, create one from bounds or walls
+            if (!boundary) {
+                if (this.floorPlan.bounds) {
+                    boundary = this.createBoundaryFromBounds();
+                } else {
+                    boundary = this.createDefaultBoundary();
+                }
+                this.floorPlan.boundary = boundary;
+            }
+            
+            // Start with the full boundary as allowed area
+            let allowedAreas = [boundary];
+            
+            // Subtract restricted zones from allowed areas
+            for (const restrictedZone of this.restrictedZones) {
+                if (restrictedZone.polygon && restrictedZone.constraint === 'hard') {
+                    // Use geometry engine to subtract restricted area
+                    try {
+                        allowedAreas = this.geometryEngine.subtractPolygons(allowedAreas, [restrictedZone.polygon]);
+                    } catch (error) {
+                        this.log('Warning: Failed to subtract restricted zone', { error: error.message });
+                    }
+                }
+            }
+            
+            // Store calculated allowed zones
+            this.allowedZones = this.allowedZones || [];
+            
+            // Add calculated allowed areas to allowed zones
+            for (const area of allowedAreas) {
+                if (area && area.length > 2) { // Valid polygon
+                    this.allowedZones.push({
+                        type: 'calculated_allowed',
+                        polygon: area,
+                        priority: 1.0,
+                        bonus: 0.0
+                    });
+                }
+            }
+            
+            this.log('Allowed zones calculated', {
+                totalAllowedZones: this.allowedZones.length,
+                restrictedZonesProcessed: this.restrictedZones.filter(z => z.constraint === 'hard').length
+            });
+            
+        } catch (error) {
+            this.logError('Calculate allowed zones failed', error);
+            // Don't throw - continue with empty allowed zones
+            this.allowedZones = this.allowedZones || [];
+        }
+    }
+
+    /**
      * PLACEMENT GRID SYSTEM
      */
 
