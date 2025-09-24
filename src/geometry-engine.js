@@ -1,4 +1,3 @@
-
 /**
  * Production-Level Geometry Engine - ENHANCED VERSION
  * 

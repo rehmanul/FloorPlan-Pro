@@ -54,18 +54,28 @@ try {
 }
 
 try {
-    GeometryEngine = require('./geometry-engine');
+    const GeometryEngineClass = require('./geometry-engine');
+    GeometryEngine = GeometryEngineClass;
 } catch (e) {
+    console.warn('[IlotPlacementEngine] GeometryEngine not available, using fallback');
     // Fallback geometry engine
     GeometryEngine = class {
         constructor(options = {}) {
             this.tolerance = (options && typeof options.tolerance === 'number') ? options.tolerance : 0.001;
             this.debugMode = (options && typeof options.debugMode === 'boolean') ? options.debugMode : false;
-            console.log('[GeometryEngine] GeometryEngine initialized', { tolerance: this.tolerance });
+            console.log('[GeometryEngine] Fallback GeometryEngine initialized', { tolerance: this.tolerance });
         }
         offsetPolygon(polygon, distance) {
-            // Return the original polygon as fallback
-            return Array.isArray(polygon) ? polygon : [];
+            // Simple fallback - return original polygon
+            return Array.isArray(polygon) ? [polygon] : [];
+        }
+        isValidPoint(point) {
+            return Array.isArray(point) && point.length >= 2 && 
+                   typeof point[0] === 'number' && typeof point[1] === 'number';
+        }
+        isValidPolygon(polygon) {
+            return Array.isArray(polygon) && polygon.length >= 3 && 
+                   polygon.every(point => this.isValidPoint(point));
         }
     };
 }

@@ -390,19 +390,23 @@ app.post('/api/advanced-placement', async (req, res) => {
         let stats = {};
         
         try {
+            console.log('🏗️ Attempting advanced placement...');
             placedIlots = await placementEngine.generateOptimizedPlacement(validFloorPlan, options);
             stats = placementEngine.getStatistics();
+            console.log('✅ Advanced placement succeeded:', placedIlots.length, 'îlots');
         } catch (placementError) {
-            console.error('❌ Placement generation failed:', placementError);
+            console.error('❌ Advanced placement failed:', placementError.message);
             
             // Fallback to simple grid placement
-            console.log('🔄 Falling back to simple grid placement');
+            console.log('🔄 Using fallback grid placement...');
             placedIlots = generateSimpleGridPlacement(validFloorPlan, options);
+            console.log('✅ Fallback placement generated:', placedIlots.length, 'îlots');
             stats = {
                 totalAttempts: 1,
                 successfulPlacements: placedIlots.length,
                 collisionDetections: 0,
-                spatialEfficiency: 0.7
+                spatialEfficiency: 0.7,
+                method: 'fallback'
             };
         }
         
@@ -455,43 +459,74 @@ app.post('/api/advanced-placement', async (req, res) => {
     }
 });
 
-// Fallback function for simple grid placement
+// Enhanced fallback function for simple grid placement
 function generateSimpleGridPlacement(floorPlan, options) {
+    console.log('🔧 Generating fallback grid placement with options:', options);
+    
     const bounds = floorPlan.bounds || { minX: 0, minY: 0, maxX: 20, maxY: 15 };
     const ilots = [];
     const ilotWidth = options.ilotWidth || 3.0;
     const ilotHeight = options.ilotHeight || 2.0;
-    const spacing = options.minDistance || 2.0;
-    const coverage = options.coverage || 0.3;
+    const spacing = options.minDistance || 1.5;
+    const coverage = options.coverage || 0.25;
     
-    const maxIlots = Math.floor(coverage * 10); // Simple calculation
+    // Calculate available area and target number of îlots
+    const totalArea = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY);
+    const ilotArea = ilotWidth * ilotHeight;
+    const targetIlots = Math.floor((totalArea * coverage) / ilotArea);
+    const maxIlots = Math.max(targetIlots, 5); // Ensure at least 5 îlots
+    
+    console.log('📐 Placement parameters:', {
+        bounds,
+        totalArea,
+        ilotArea,
+        targetIlots,
+        maxIlots,
+        coverage
+    });
+    
     let count = 0;
+    const ilotTypes = ['workspace', 'meeting', 'social', 'break'];
     
-    for (let x = bounds.minX + ilotWidth/2 + 1; x < bounds.maxX - ilotWidth/2 - 1 && count < maxIlots; x += ilotWidth + spacing) {
-        for (let y = bounds.minY + ilotHeight/2 + 1; y < bounds.maxY - ilotHeight/2 - 1 && count < maxIlots; y += ilotHeight + spacing) {
+    // Generate îlots in a grid pattern
+    for (let x = bounds.minX + ilotWidth/2 + 0.5; x <= bounds.maxX - ilotWidth/2 - 0.5 && count < maxIlots; x += ilotWidth + spacing) {
+        for (let y = bounds.minY + ilotHeight/2 + 0.5; y <= bounds.maxY - ilotHeight/2 - 0.5 && count < maxIlots; y += ilotHeight + spacing) {
+            const ilotType = ilotTypes[count % ilotTypes.length];
+            const capacity = ilotType === 'meeting' ? 8 : 4;
+            
             ilots.push({
                 id: `fallback_ilot_${count + 1}`,
-                type: 'workspace',
+                type: ilotType,
                 x: x - ilotWidth / 2,
                 y: y - ilotHeight / 2,
                 width: ilotWidth,
                 height: ilotHeight,
-                capacity: 4,
-                equipment: ['desks', 'chairs'],
+                capacity: capacity,
+                equipment: ilotType === 'meeting' ? ['table', 'chairs', 'screen'] : ['desks', 'chairs'],
                 isValid: true,
                 clearance: spacing/2,
                 accessibility: 0.8,
                 score: 0.8,
                 position: { x: x, y: y, z: 0 },
                 dimensions: { width: ilotWidth, height: ilotHeight },
-                properties: { capacity: 4, equipment: ['desks', 'chairs'], type: 'workspace' },
+                properties: { 
+                    capacity: capacity, 
+                    equipment: ilotType === 'meeting' ? ['table', 'chairs', 'screen'] : ['desks', 'chairs'], 
+                    type: ilotType 
+                },
                 validation: { isValid: true, clearance: spacing/2, accessibility: 0.8, issues: [] },
-                metadata: { placementScore: 0.8, created: new Date().toISOString(), placementMethod: 'fallback-grid' }
+                metadata: { 
+                    placementScore: 0.8, 
+                    created: new Date().toISOString(), 
+                    placementMethod: 'enhanced-fallback-grid',
+                    gridPosition: { col: Math.floor((x - bounds.minX) / (ilotWidth + spacing)), row: Math.floor((y - bounds.minY) / (ilotHeight + spacing)) }
+                }
             });
             count++;
         }
     }
     
+    console.log(`✅ Generated ${count} fallback îlots`);
     return ilots;
 }
 
