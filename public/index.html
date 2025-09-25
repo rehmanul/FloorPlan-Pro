@@ -3542,7 +3542,7 @@
 
         // Function to highlight selected element and show its properties
         function highlightSelectedElement(dbId) {
-            viewer.getProperties(dbId, function(props) {
+            viewer.getProperties(dbId, (props) => {
                 const info = `
                     <div style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 6px; max-width: 250px; z-index: 1500;">
                         <h5 style="margin: 0 0 8px 0;">${props.name}</h5>
@@ -3662,21 +3662,21 @@
                         }
 
                         // Load the viewable into the viewer
-                        viewer.loadDocumentNode(doc, viewables).then(function(result) {
+                        viewer.loadDocumentNode(doc, viewables).then(async function(result) {
                             console.log('🎉 Model loaded successfully!');
 
                             // Initialize viewer overlay system
-                            if (floorPlanController && !floorPlanController.viewerOverlay) {
-                                const overlaySuccess = floorPlanController.initializeViewer(viewer);
+                            if (floorPlanController) {
+                                const overlaySuccess = await floorPlanController.initializeViewer(viewer);
                                 if (overlaySuccess) {
                                     console.log('✅ Viewer overlay system initialized');
 
                                     // Sync any existing elements to viewer
                                     if (generatedIlots.length > 0) {
-                                        floorPlanController.addIlots(generatedIlots);
+                                        await floorPlanController.addIlots(generatedIlots);
                                     }
                                     if (corridorNetwork.length > 0) {
-                                        floorPlanController.addCorridors(corridorNetwork);
+                                        await floorPlanController.addCorridors(corridorNetwork);
                                     }
                                 }
                             }
@@ -3690,7 +3690,7 @@
                                     analyzeFloorPlan(currentUrn);
                                 }, 2000);
                             }
-                            
+
                             // Add event listeners after model is loaded
                             viewer.addEventListener(Autodesk.Viewing.GEOMETRY_LOADED_EVENT, function() {
                                 console.log('🎨 Geometry loaded - fitting to view');
@@ -3704,10 +3704,7 @@
 
                                 // Show îlots if generated
                                 // visualizeIlotsOn3D(); // Unified controller handles this now
-
-                                // Show corridors if generated
                                 // visualizeCorridorsOn3D(corridorNetwork); // Unified controller handles this now
-
 
                                 // Setup camera listener for overlay updates
                                 setupCameraListener();
@@ -4228,25 +4225,14 @@
 
             // Convert corridor polygon to 3D coordinates
             const worldPolygon = corridor.polygon.map(point => convertToWorldCoordinates(point[0], point[1], 0));
-
-            // Create a 3D mesh for the corridor
             const shape = new THREE.Shape(worldPolygon.map(p => new THREE.Vector2(p.x, p.y)));
-            const geometry = new THREE.ShapeBufferGeometry(shape);
-
-            // Extrude the shape to give it thickness (height in 3D)
-            const extrudeSettings = {
-                steps: 1,
-                depth: 15, // Example height, adjust as needed
-                bevelEnabled: false
-            };
+            const extrudeSettings = { steps: 1, depth: 15, bevelEnabled: false };
             const extrudedGeometry = new THREE.ExtrudeBufferGeometry(shape, extrudeSettings);
-
             const material = new THREE.MeshBasicMaterial({
                 color: corridor.style?.color || '#f59e0b', // Use corridor color or default
                 opacity: corridor.style?.opacity || 0.6,
                 transparent: true
             });
-
             const mesh = new THREE.Mesh(extrudedGeometry, material);
             mesh.position.z = 5; // Adjust Z position if needed
 
@@ -4260,7 +4246,8 @@
             if (!window.corridorOverlays) window.corridorOverlays = [];
             window.corridorOverlays.push({
                 element: mesh,
-                worldPolygon: worldPolygon
+                worldPolygon: worldPolygon,
+                id: `corridor-${corridor.id || index}`
             });
         }
 
@@ -4336,10 +4323,12 @@
                 this.needsRender = true;
                 this.dpr = window.devicePixelRatio || 1; // Device pixel ratio
                 this.viewerInstance = null;
-                this.viewerOverlayScene = null;
-                this.ilotOverlays = [];
-                this.corridorOverlays = [];
+                this.overlayScene = null; // Holds the THREE.js scene for viewer overlays
+                this.ilotOverlays = []; // HTML elements for ilot overlays
+                this.corridorOverlays = []; // THREE.js meshes for corridor overlays
                 this.loadedModelId = null; // To track the currently loaded model
+                this.ilotData = null; // Store ilot data for rendering
+                this.corridorData = null; // Store corridor data for rendering
             }
 
             async initializeCanvas(canvasOptions) {
@@ -4574,14 +4563,15 @@
             // --- Dual Mode Integration ---
             async initializeViewer(viewerInstance) {
                 this.viewerInstance = viewerInstance;
-                this.viewerOverlayScene = new THREE.Scene(); // Scene for overlay elements
-
-                // Inject the overlay scene into the viewer
+                // Use correct Autodesk Viewer overlay system
                 if (this.viewerInstance && this.viewerInstance.impl) {
-                    this.viewerInstance.impl.addOverlayScene('floorplan-overlay', this.viewerOverlayScene);
+                    // Create overlay manager using the correct API
+                    this.viewerInstance.impl.createOverlayScene('floorplan-overlay', null, true);
+                    this.overlayScene = this.viewerInstance.impl.overlayScenes['floorplan-overlay'];
+
                     this.viewerInstance.addEventListener(Autodesk.Viewing.CAMERA_TRANSITION_EVENT, this.updateViewerOverlays.bind(this));
                     this.viewerInstance.addEventListener(Autodesk.Viewing.CAMERA_CHANGE_EVENT, this.updateViewerOverlays.bind(this));
-                    console.log('Viewer overlay system initialized.');
+                    console.log('✅ Viewer overlay system initialized with correct API.');
                     return true;
                 }
                 return false;
@@ -4608,7 +4598,7 @@
             }
 
             renderIlotsOnViewer() {
-                if (!this.viewerInstance || !this.viewerOverlayScene || !this.ilotData) return;
+                if (!this.viewerInstance || !this.overlayScene || !this.ilotData) return;
 
                 // Clear previous overlays
                 this.clearViewerOverlays('ilot');
@@ -4635,7 +4625,7 @@
             }
 
             renderCorridorsOnViewer() {
-                if (!this.viewerInstance || !this.viewerOverlayScene || !this.corridorData) return;
+                if (!this.viewerInstance || !this.overlayScene || !this.corridorData) return;
 
                 this.clearViewerOverlays('corridor');
 
