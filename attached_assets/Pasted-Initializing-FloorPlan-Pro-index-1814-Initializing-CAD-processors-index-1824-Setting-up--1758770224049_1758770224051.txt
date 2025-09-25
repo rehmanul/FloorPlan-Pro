@@ -1,0 +1,99 @@
+Initializing FloorPlan Pro...
+(index):1814 Initializing CAD processors...
+(index):1824 Setting up UI event listeners...
+(index):1849 ✅ Canvas controller initialized successfully
+(index):4851 FloorPlan Pro - Production CAD Analysis Engine Loaded
+content.js:1 Uncaught TypeError: Cannot read properties of undefined (reading 'query')
+    at content.js:1:13
+/favicon.ico:1  Failed to load resource: the server responded with a status of 404 (Not Found)
+(index):3802 Translation status: inprogress (0% complete)
+(index):3802 Translation status: inprogress (0% complete)
+(index):3802 Translation status: success (complete)
+(index):3623 🎯 Initializing Autodesk Viewer for URN: dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Ynpja29meW52ZTJ3NHJwem55bW9vYnlhZ3VxeGt3ZWwvMTc1ODc2OTk1MTg2MC1vdm9ET1NTSUVSJTIwQ09TVE8lMjAtJTIwcGxhbiUyMGVudHJlc29sLSUyMHByb2pldC5wZGY=
+endpoints.js:236 getCdnRedirectUrl is deprecated and will be removed soon
+ze.getCdnRedirectUrl @ endpoints.js:236
+(index):3748 ✅ Access token obtained
+(index):3633 ✅ Autodesk Viewer SDK initialized
+WebGLRenderer.js:29 THREE.WebGLRenderer 71
+WebGLRenderer.js:229 WebGL Renderer: ANGLE (Intel, Intel(R) UHD Graphics (0x00009B41) Direct3D11 vs_5_0 ps_5_0, D3D11)
+WebGLRenderer.js:230 WebGL Vendor: Google Inc. (Intel)
+(index):3649 ✅ Viewer started successfully
+api-js.mixpanel.com/track/?verbose=1&ip=1&_=1758769964760:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+api-js.mixpanel.com/track/?verbose=1&ip=1&_=1758769964764:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+(index):3654 ✅ Document loaded successfully
+(index):3666 🎉 Model loaded successfully!
+(index):3729 ❌ Failed to load model: TypeError: Cannot create property 'cutplanes' on boolean 'true'
+    at QA.addNonHDRMaterial (MaterialManager.js:153:13)
+    at QA.addOverrideMaterial (MaterialManager.js:298:10)
+    at aM.createOverlayScene (Viewer3DImpl.js:2635:24)
+    at UnifiedFloorPlanController.initializeViewer ((index):4569:46)
+    at (index):3670:82
+(anonymous) @ (index):3729
+(index):2026 Viewer attempt 1 failed: Cannot create property 'cutplanes' on boolean 'true'
+(anonymous) @ (index):2026
+(index):1 Autofocus processing was blocked because a document already has a focused element.
+(index):3623 🎯 Initializing Autodesk Viewer for URN: dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Ynpja29meW52ZTJ3NHJwem55bW9vYnlhZ3VxeGt3ZWwvMTc1ODc2OTk1MTg2MC1vdm9ET1NTSUVSJTIwQ09TVE8lMjAtJTIwcGxhbiUyMGVudHJlc29sLSUyMHByb2pldC5wZGY=
+endpoints.js:236 getCdnRedirectUrl is deprecated and will be removed soon
+ze.getCdnRedirectUrl @ endpoints.js:236
+(index):3748 ✅ Access token obtained
+(index):3633 ✅ Autodesk Viewer SDK initialized
+WebGLRenderer.js:29 THREE.WebGLRenderer 71
+WebGLRenderer.js:229 WebGL Renderer: ANGLE (Intel, Intel(R) UHD Graphics (0x00009B41) Direct3D11 vs_5_0 ps_5_0, D3D11)
+WebGLRenderer.js:230 WebGL Vendor: Google Inc. (Intel)
+(index):3649 ✅ Viewer started successfully
+(index):3654 ✅ Document loaded successfully
+(index):3666 🎉 Model loaded successfully!
+(index):3729 ❌ Failed to load model: TypeError: Cannot create property 'cutplanes' on boolean 'true'
+    at QA.addNonHDRMaterial (MaterialManager.js:153:13)
+    at QA.addOverrideMaterial (MaterialManager.js:298:10)
+    at aM.createOverlayScene (Viewer3DImpl.js:2635:24)
+    at UnifiedFloorPlanController.initializeViewer ((index):4569:46)
+    at (index):3670:82
+(anonymous) @ (index):3729
+(index):2026 Viewer attempt 2 failed: Cannot create property 'cutplanes' on boolean 'true'
+(anonymous) @ (index):2026
+api-js.mixpanel.com/track/?verbose=1&ip=1&_=1758769979771:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+(index):3623 🎯 Initializing Autodesk Viewer for URN: dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Ynpja29meW52ZTJ3NHJwem55bW9vYnlhZ3VxeGt3ZWwvMTc1ODc2OTk1MTg2MC1vdm9ET1NTSUVSJTIwQ09TVE8lMjAtJTIwcGxhbiUyMGVudHJlc29sLSUyMHByb2pldC5wZGY=
+endpoints.js:236 getCdnRedirectUrl is deprecated and will be removed soon
+ze.getCdnRedirectUrl @ endpoints.js:236
+(index):3748 ✅ Access token obtained
+(index):3633 ✅ Autodesk Viewer SDK initialized
+WebGLRenderer.js:29 THREE.WebGLRenderer 71
+WebGLRenderer.js:229 WebGL Renderer: ANGLE (Intel, Intel(R) UHD Graphics (0x00009B41) Direct3D11 vs_5_0 ps_5_0, D3D11)
+WebGLRenderer.js:230 WebGL Vendor: Google Inc. (Intel)
+(index):3649 ✅ Viewer started successfully
+(index):3654 ✅ Document loaded successfully
+api-js.mixpanel.com/track/?verbose=1&ip=1&_=1758769986099:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+(index):3666 🎉 Model loaded successfully!
+(index):3729 ❌ Failed to load model: TypeError: Cannot create property 'cutplanes' on boolean 'true'
+    at QA.addNonHDRMaterial (MaterialManager.js:153:13)
+    at QA.addOverrideMaterial (MaterialManager.js:298:10)
+    at aM.createOverlayScene (Viewer3DImpl.js:2635:24)
+    at UnifiedFloorPlanController.initializeViewer ((index):4569:46)
+    at (index):3670:82
+(anonymous) @ (index):3729
+(index):2026 Viewer attempt 3 failed: Cannot create property 'cutplanes' on boolean 'true'
+(anonymous) @ (index):2026
+(index):4870 🔄 Switched to Autodesk Viewer mode
+api-js.mixpanel.com/track/?verbose=1&ip=1&_=1758769994777:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+(index):2144 Placement Statistics: Object
+(index):2526 🔍 Running comprehensive placement validation...
+(index):2552 ✅ Validation completed: PASSED (Score: 90%)
+(index):2140 🔍 Post-generation validation: Object
+(index):2353 Corridor Generation Statistics: Object
+api-js.mixpanel.com/track/?verbose=1&ip=1&_=1758770009784:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+(index):2526 🔍 Running comprehensive placement validation...
+(index):2552 ✅ Validation completed: FAILED (Score: 5%)
+(index):2349 🔍 Post-corridor validation: Object
+(index):2526 🔍 Running comprehensive placement validation...
+(index):2552 ✅ Validation completed: FAILED (Score: 5%)
+
+
+Corridor optimization engine not available
+⚠️ Validation issues found! Score: 5%
+
+Detected Elements
+Walls: 0
+Doors: 0
+Windows: 0
+Restricted Areas: 0
