@@ -165,6 +165,8 @@
             height: 100%; 
             background: white;
             cursor: crosshair;
+            display: none; /* Initially hidden */
+            visibility: hidden;
         }
 
         #forgeViewer { 
@@ -794,16 +796,18 @@
     <script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/viewer3D.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script> <!-- Added for 3D visualizations -->
+
     <script>
         // --- GLOBAL VARIABLES ---
-        let viewer, canvas, cadProcessor, floorAnalyzer, ilotEngine, corridorGenerator;
+        let viewer, canvasController, cadProcessor, floorAnalyzer, ilotEngine, corridorGenerator;
         let advancedIlotsManager, aiRoomDetector, navigationController, collaborationSystem;
         let currentFloorPlan = null;
-        let detectedElements = { walls: [], doors: [], windows: [], restrictedAreas: [] };
         let generatedIlots = [];
         let corridorNetwork = [];
         let currentUrn = null;
         let analysisResults = null;
+        let currentViewMode = 'autodesk'; // Track current view mode
 
         // --- PRODUCTION CAD PROCESSOR ---
         class CADProcessor {
@@ -1715,340 +1719,6 @@
             }
         }
 
-        // --- ADVANCED FLOOR PLAN RENDERER ---
-        class FloorPlanRenderer {
-            constructor(canvas) {
-                this.canvas = canvas;
-                this.ctx = canvas.getContext('2d');
-                this.scale = 1;
-                this.offsetX = 0;
-                this.offsetY = 0;
-                this.setupCanvas();
-            }
-
-            setupCanvas() {
-                this.resizeCanvas();
-                window.addEventListener('resize', () => this.resizeCanvas());
-                this.setupInteractions();
-            }
-
-            resizeCanvas() {
-                const rect = this.canvas.parentElement.getBoundingClientRect();
-                this.canvas.width = rect.width;
-                this.canvas.height = rect.height;
-                this.canvas.style.width = rect.width + 'px';
-                this.canvas.style.height = rect.height + 'px';
-            }
-
-            setupInteractions() {
-                let isDragging = false;
-                let lastX = 0;
-                let lastY = 0;
-                let hasMouseMoved = false;
-
-                this.canvas.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    isDragging = true;
-                    hasMouseMoved = false;
-                    lastX = e.clientX;
-                    lastY = e.clientY;
-                    this.canvas.style.cursor = 'grabbing';
-                });
-
-                this.canvas.addEventListener('mousemove', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    if (isDragging) {
-                        hasMouseMoved = true;
-                        const deltaX = e.clientX - lastX;
-                        const deltaY = e.clientY - lastY;
-                        this.offsetX += deltaX;
-                        this.offsetY += deltaY;
-                        this.render();
-                        lastX = e.clientX;
-                        lastY = e.clientY;
-                    }
-                });
-
-                this.canvas.addEventListener('mouseup', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    isDragging = false;
-                    this.canvas.style.cursor = 'crosshair';
-                    
-                    // Only trigger click events if mouse didn't move (pure click)
-                    if (!hasMouseMoved) {
-                        this.handleCanvasClick(e);
-                    }
-                    hasMouseMoved = false;
-                });
-
-                this.canvas.addEventListener('wheel', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    const rect = this.canvas.getBoundingClientRect();
-                    const centerX = rect.width / 2;
-                    const centerY = rect.height / 2;
-                    
-                    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-                    const oldScale = this.scale;
-                    this.scale *= zoomFactor;
-                    
-                    // Zoom towards mouse position
-                    const mouseX = e.clientX - rect.left;
-                    const mouseY = e.clientY - rect.top;
-                    
-                    this.offsetX = mouseX - (mouseX - this.offsetX) * (this.scale / oldScale);
-                    this.offsetY = mouseY - (mouseY - this.offsetY) * (this.scale / oldScale);
-                    
-                    this.render();
-                });
-
-                // Prevent context menu
-                this.canvas.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                });
-            }
-
-            handleCanvasClick(e) {
-                // Handle canvas click without interfering with view switching
-                const rect = this.canvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                
-                console.log('Canvas clicked at:', x, y);
-                // Add any click handling logic here without switching views
-            }
-
-            render(floorPlan, ilots = [], corridors = []) {
-                // Only render if canvas is visible and in canvas view
-                if (currentView !== 'canvas' || this.canvas.style.display === 'none') {
-                    return;
-                }
-
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-                if (!floorPlan) {
-                    this.renderPlaceholder();
-                    return;
-                }
-
-                this.ctx.save();
-                this.ctx.translate(this.offsetX, this.offsetY);
-                this.ctx.scale(this.scale, this.scale);
-
-                // Center the floor plan
-                const bounds = floorPlan.bounds || { minX: 0, minY: 0, maxX: 20, maxY: 15 };
-                const centerX = (bounds.maxX + bounds.minX) / 2;
-                const centerY = (bounds.maxY + bounds.minY) / 2;
-                this.ctx.translate(-centerX + this.canvas.width / (2 * this.scale), 
-                                 -centerY + this.canvas.height / (2 * this.scale));
-
-                // Render mock floor plan if no real data
-                if (!floorPlan.walls || floorPlan.walls.length === 0) {
-                    this.renderMockFloorPlan();
-                } else {
-                    this.renderWalls(floorPlan.walls);
-                    this.renderRestrictedAreas(floorPlan.restrictedAreas);
-                    this.renderDoors(floorPlan.doors);
-                    this.renderWindows(floorPlan.windows);
-                }
-
-                this.renderIlots(ilots);
-                this.renderCorridors(corridors);
-                this.renderRoomLabels(floorPlan.rooms);
-
-                this.ctx.restore();
-                
-                // Save state after successful render
-                preserveCanvasState();
-            }
-
-            renderPlaceholder() {
-                this.ctx.fillStyle = '#f0f0f0';
-                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-                this.ctx.fillStyle = '#666';
-                this.ctx.font = '24px Inter';
-                this.ctx.textAlign = 'center';
-                this.ctx.fillText('Upload a CAD file to view floor plan', 
-                    this.canvas.width / 2, this.canvas.height / 2);
-            }
-
-            renderMockFloorPlan() {
-                // Draw simple room outline
-                this.ctx.strokeStyle = '#333';
-                this.ctx.lineWidth = 0.2;
-                this.ctx.strokeRect(0, 0, 20, 15);
-
-                // Add some internal walls
-                this.ctx.beginPath();
-                this.ctx.moveTo(8, 0);
-                this.ctx.lineTo(8, 15);
-                this.ctx.moveTo(0, 8);
-                this.ctx.lineTo(20, 8);
-                this.ctx.stroke();
-            }
-
-            renderWalls(walls) {
-                this.ctx.strokeStyle = getComputedStyle(document.documentElement)
-                    .getPropertyValue('--wall-color').trim();
-                this.ctx.lineWidth = 0.1;
-                this.ctx.lineCap = 'round';
-
-                walls.forEach(wall => {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(wall.x1, wall.y1);
-                    this.ctx.lineTo(wall.x2, wall.y2);
-                    this.ctx.stroke();
-                });
-            }
-
-            renderRestrictedAreas(restrictedAreas) {
-                this.ctx.fillStyle = getComputedStyle(document.documentElement)
-                    .getPropertyValue('--restricted-color').trim() + '40';
-                this.ctx.strokeStyle = getComputedStyle(document.documentElement)
-                    .getPropertyValue('--restricted-color').trim();
-                this.ctx.lineWidth = 0.05;
-
-                restrictedAreas.forEach(area => {
-                    this.ctx.fillRect(area.x, area.y, area.width, area.height);
-                    this.ctx.strokeRect(area.x, area.y, area.width, area.height);
-                });
-            }
-
-            renderDoors(doors) {
-                this.ctx.strokeStyle = getComputedStyle(document.documentElement)
-                    .getPropertyValue('--entrance-color').trim();
-                this.ctx.lineWidth = 0.08;
-
-                doors.forEach(door => {
-                    // Draw door opening
-                    this.ctx.beginPath();
-                    this.ctx.arc(door.x, door.y, door.width, 0, door.angle || Math.PI/2);
-                    this.ctx.stroke();
-
-                    // Draw door swing arc
-                    this.ctx.beginPath();
-                    this.ctx.setLineDash([0.1, 0.05]);
-                    this.ctx.arc(door.x, door.y, door.width, 0, door.angle || Math.PI/2);
-                    this.ctx.stroke();
-                    this.ctx.setLineDash([]);
-                });
-            }
-
-            renderWindows(windows) {
-                this.ctx.strokeStyle = getComputedStyle(document.documentElement)
-                    .getPropertyValue('--entrance-color').trim();
-                this.ctx.lineWidth = 0.06;
-
-                windows.forEach(window => {
-                    this.ctx.beginPath();
-                    this.ctx.moveTo(window.x1, window.y1);
-                    this.ctx.lineTo(window.x2, window.y2);
-
-                    // Add window symbol
-                    const midX = (window.x1 + window.x2) / 2;
-                    const midY = (window.y1 + window.y2) / 2;
-                    this.ctx.moveTo(midX - 0.1, midY - 0.1);
-                    this.ctx.lineTo(midX + 0.1, midY + 0.1);
-                    this.ctx.moveTo(midX + 0.1, midY - 0.1);
-                    this.ctx.lineTo(midX - 0.1, midY + 0.1);
-
-                    this.ctx.stroke();
-                });
-            }
-
-            renderIlots(ilots) {
-                ilots.forEach((ilot, index) => {
-                    // Color code by type
-                    const colors = {
-                        single: '#10B981',
-                        double: '#3B82F6', 
-                        team: '#8B5CF6',
-                        meeting: '#F59E0B'
-                    };
-
-                    this.ctx.fillStyle = colors[ilot.type] || '#10B981';
-                    this.ctx.strokeStyle = '#1F2937';
-                    this.ctx.lineWidth = 0.02;
-
-                    // Draw ilot rectangle
-                    this.ctx.fillRect(ilot.x, ilot.y, ilot.width, ilot.height);
-                    this.ctx.strokeRect(ilot.x, ilot.y, ilot.width, ilot.height);
-
-                    // Add capacity label
-                    this.ctx.fillStyle = '#FFFFFF';
-                    this.ctx.font = '0.3px Inter';
-                    this.ctx.textAlign = 'center';
-                    this.ctx.fillText(
-                        ilot.capacity.toString(),
-                        ilot.x + ilot.width / 2,
-                        ilot.y + ilot.height / 2 + 0.1
-                    );
-                });
-            }
-
-            renderCorridors(corridors) {
-                this.ctx.strokeStyle = getComputedStyle(document.documentElement)
-                    .getPropertyValue('--corridor-color').trim();
-                this.ctx.fillStyle = getComputedStyle(document.documentElement)
-                    .getPropertyValue('--corridor-color').trim() + '20';
-                this.ctx.lineWidth = 0.04;
-
-                corridors.forEach(corridor => {
-                    // Draw corridor area
-                    this.ctx.fillRect(corridor.x, corridor.y, corridor.width, corridor.height);
-                    this.ctx.strokeRect(corridor.x, corridor.y, corridor.width, corridor.height);
-
-                    // Add area label
-                    this.ctx.fillStyle = '#1F2937';
-                    this.ctx.font = '0.2px Inter';
-                    this.ctx.textAlign = 'center';
-                    this.ctx.fillText(
-                        `${corridor.area.toFixed(1)}m²`,
-                        corridor.x + corridor.width / 2,
-                        corridor.y + corridor.height / 2
-                    );
-                });
-            }
-
-            renderRoomLabels(rooms) {
-                this.ctx.fillStyle = '#1F2937';
-                this.ctx.font = '0.4px Inter';
-                this.ctx.textAlign = 'center';
-
-                rooms.forEach(room => {
-                    this.ctx.fillText(
-                        `${room.name} (${room.area.toFixed(1)}m²)`,
-                        room.center.x,
-                        room.center.y
-                    );
-                });
-            }
-
-            fitToView() {
-                if (!currentFloorPlan) return;
-
-                const bounds = currentFloorPlan.bounds;
-                const width = bounds.maxX - bounds.minX;
-                const height = bounds.maxY - bounds.minY;
-
-                const scaleX = (this.canvas.width * 0.8) / width;
-                const scaleY = (this.canvas.height * 0.8) / height;
-
-                this.scale = Math.min(scaleX, scaleY);
-                this.offsetX = 0;
-                this.offsetY = 0;
-
-                this.render(currentFloorPlan, generatedIlots, corridorNetwork);
-            }
-        }
-
         // --- EXPORT ENGINE ---
         class ExportEngine {
             static async exportToPDF(floorPlan, ilots, corridors) {
@@ -2141,24 +1811,22 @@
         function initializeApplication() {
             console.log('Initializing FloorPlan Pro...');
 
-            // Initialize processors
-            cadProcessor = new CADProcessor();
+            // Initialize engines
+            initializeIlotEngine();
+            initializeCorridorGenerator();
 
-            // Initialize canvas safely
-            try {
-                const canvasElement = document.getElementById('floorPlanCanvas');
-                if (canvasElement) {
-                    canvas = new FloorPlanRenderer(canvasElement);
-                }
-            } catch (error) {
-                console.log('Canvas initialization skipped:', error.message);
-            }
+            // Initialize canvas controller
+            // Initialized later when switching to canvas view
+
+            // Load Forge viewer for Autodesk view
+            loadForgeViewer();
 
             // Setup event listeners
             setupEventListeners();
             setupSidebarToggles();
 
             updateStatus('FloorPlan Pro Ready', 'Upload a CAD file to begin professional analysis.');
+            console.log('FloorPlan Pro - Production CAD Analysis Engine Loaded');
         }
 
         function setupEventListeners() {
@@ -2198,7 +1866,7 @@
                 e.stopPropagation();
                 switchToAutodeskView();
             });
-            
+
             document.getElementById('canvasViewBtn').addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -2382,16 +2050,12 @@
                     updateAnalysisStats();
 
                     // Refresh canvas render
-                    if (canvas && canvas.render) {
-                        canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
-                        canvas.fitToView();
+                    if (canvasController && currentViewMode === 'canvas') {
+                        await renderOnCanvas();
                     }
-
                     // Visualize îlots on 3D model with precise positioning
-                    if (viewer && viewer.model) {
-                        setTimeout(() => {
-                            visualizeIlotsOn3D();
-                        }, 500);
+                    if (viewer && viewer.impl && generatedIlots.length > 0) {
+                        visualizeIlotsOn3D();
                     }
 
                     setProgress(100);
@@ -2501,7 +2165,7 @@
 
                 if (response.ok) {
                     const result = await response.json();
-                    
+
                     if (result.success && result.ilots) {
                         // Update the generated îlots with optimized positions
                         generatedIlots = result.ilots.map(ilot => ({
@@ -2510,16 +2174,17 @@
                             efficiency: ilot.score || 0.85
                         }));
 
-                        // Re-render the visualization
-                        if (canvas && canvas.render) {
-                            canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
+                        // Update visualizations in both views
+                        if (viewer && viewer.impl) {
+                            visualizeIlotsOn3D(generatedIlots);
                         }
 
-                        // Update 3D visualization if available
-                        if (viewer && viewer.impl && generatedIlots.length > 0) {
-                            await visualizeIlotsOn3D(generatedIlots);
+                        if (currentViewMode === 'canvas' && canvasController) {
+                            await renderOnCanvas();
                         }
 
+
+                        hideStatusOverlay();
                         showNotification(`Layout optimized: ${generatedIlots.length} îlots repositioned for maximum efficiency`, 'success');
                     } else {
                         throw new Error(result.error || 'Optimization failed');
@@ -2530,9 +2195,8 @@
 
             } catch (error) {
                 console.error('Layout optimization failed:', error);
-                showNotification(`Optimization failed: ${error.message}`, 'error');
-            } finally {
                 hideStatusOverlay();
+                showNotification(`Optimization failed: ${error.message}`, 'error');
             }
         }
 
@@ -2599,10 +2263,13 @@
                     updateCorridorsList();
                     updateAnalysisStats();
 
-                    // Refresh canvas render with corridors
-                    if (canvas && canvas.render) {
-                        canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
-                        canvas.fitToView();
+                    // Update canvas view if active
+                    if (currentViewMode === 'canvas' && canvasController) {
+                        await renderOnCanvas();
+                    }
+                    // Visualize corridors on 3D model
+                    if (viewer && viewer.impl) {
+                        visualizeCorridorsOn3D(corridorNetwork);
                     }
 
                     setProgress(100);
@@ -2690,15 +2357,15 @@
             updateStatus('Optimizing Paths', 'Applying pathfinding algorithms...');
             showNotification('Corridor optimization in progress...', 'info');
 
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            corridorGenerator.optimizeCorridorNetwork();
-            if (canvas && canvas.render) {
-                canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
+            // Call the optimized corridor network function
+            if (corridorGenerator && corridorGenerator.optimizeCorridorNetwork) {
+                await corridorGenerator.optimizeCorridorNetwork();
+            } else {
+                // Fallback if engine not initialized
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                hideStatusOverlay();
+                showNotification('Corridor optimization engine not available', 'warning');
             }
-
-            hideStatusOverlay();
-            showNotification('Corridor network optimized', 'success');
         }
 
         // Export Functions
@@ -2835,10 +2502,16 @@
                     let minDistanceFound = Infinity;
 
                     floorPlan.walls.forEach(wall => {
+                        // Need to ensure wall has start and end points defined
+                        if (wall.x1 === undefined || wall.y1 === undefined || wall.x2 === undefined || wall.y2 === undefined) {
+                            console.warn(`Skipping validation for wall with missing coordinates:`, wall);
+                            return;
+                        }
+                        
                         const distance = this.calculatePointToLineDistance(
                             [ilot.x + ilot.width/2, ilot.y + ilot.height/2],
-                            wall.start,
-                            wall.end
+                            [wall.x1, wall.y1],
+                            [wall.x2, wall.y2]
                         );
 
                         minDistanceFound = Math.min(minDistanceFound, distance);
@@ -3285,7 +2958,7 @@
                         hideStatusOverlay();
                         updateFloorPlanDetails();
                         updateElementsList();
-                        switchToCanvasView();
+                        switchToCanvasView(); // Switch to canvas view after import
                         showNotification(`DXF imported successfully! Found ${result.floorPlan.walls?.length || 0} walls, ${result.floorPlan.redZones?.length || 0} red zones, ${result.floorPlan.blueZones?.length || 0} blue zones.`, 'success');
                     } else {
                         throw new Error(result.error || 'Import failed');
@@ -3364,22 +3037,27 @@
         }
 
         // View Management
-        let currentView = 'autodesk'; // Track current view state
+        // let currentViewMode = 'autodesk'; // Moved to global scope
 
         function switchToAutodeskView() {
-            if (currentView === 'autodesk') return; // Prevent unnecessary switches
-            
-            currentView = 'autodesk';
+            if (currentViewMode === 'autodesk') return; // Prevent unnecessary switches
+
+            currentViewMode = 'autodesk';
             document.querySelectorAll('.header-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById('autodeskViewBtn').classList.add('active');
 
             const canvasElement = document.getElementById('floorPlanCanvas');
             const viewerElement = document.getElementById('forgeViewer');
-            
+
             canvasElement.style.display = 'none';
             canvasElement.style.visibility = 'hidden';
             viewerElement.style.display = 'block';
             viewerElement.style.visibility = 'visible';
+
+            // Hide canvas controller if it exists
+            if (canvasController) {
+                canvasController.setVisible(false);
+            }
 
             if (viewer) {
                 viewer.resize();
@@ -3393,215 +3071,552 @@
             showNotification('Switched to Autodesk SDK View', 'info', 2000);
         }
 
-        function switchToCanvasView() {
-            if (currentView === 'canvas') return; // Prevent unnecessary switches
-            
-            currentView = 'canvas';
+        async function switchToCanvasView() {
+            if (currentViewMode === 'canvas') return; // Prevent unnecessary switches
+
+            currentViewMode = 'canvas';
             document.querySelectorAll('.header-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById('canvasViewBtn').classList.add('active');
 
             const canvasElement = document.getElementById('floorPlanCanvas');
             const viewerElement = document.getElementById('forgeViewer');
-            
+
             viewerElement.style.display = 'none';
             viewerElement.style.visibility = 'hidden';
             canvasElement.style.display = 'block';
             canvasElement.style.visibility = 'visible';
 
-            // Ensure canvas is properly sized and rendered
-            setTimeout(() => {
-                if (canvas) {
-                    canvas.resizeCanvas();
-                    if (canvas.render) {
-                        canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
-                        if (currentFloorPlan) {
-                            canvas.fitToView();
-                        }
-                    }
+            // Initialize canvas controller if not already done
+            if (!canvasController) {
+                await initializeCanvasView();
+            } else {
+                canvasController.setVisible(true);
+                // Re-render current data
+                if (currentFloorPlan || generatedIlots.length > 0) {
+                    await renderOnCanvas();
                 }
-            }, 100);
-            
+            }
+
+            console.log('Switched to Manual Canvas View');
             showNotification('Switched to Manual Canvas View', 'info', 2000);
         }
 
-        // Legacy view function for compatibility
-        function switchView(view) {
-            switch (view) {
-                case 'render':
-                case 'canvas':
-                    switchToCanvasView();
-                    break;
-                case 'analysis':
-                case '3d':
-                    switchToAutodeskView();
-                    break;
-                default:
-                    switchToAutodeskView();
-                    break;
-            }
-        }
+        // Initialize canvas view functionality
+        async function initializeCanvasView() {
+            try {
+                console.log('🎨 Initializing Manual Canvas View...');
 
-        // Canvas state preservation
-        function preserveCanvasState() {
-            if (canvas && currentFloorPlan) {
-                // Store current canvas state
-                const canvasState = {
-                    offsetX: canvas.offsetX,
-                    offsetY: canvas.offsetY,
-                    scale: canvas.scale,
-                    hasContent: true
-                };
-                
-                // Store in sessionStorage for persistence
-                sessionStorage.setItem('canvasState', JSON.stringify(canvasState));
-            }
-        }
+                const canvasElement = document.getElementById('floorPlanCanvas');
+                if (!canvasElement) {
+                    throw new Error('Canvas element not found');
+                }
 
-        function restoreCanvasState() {
-            const savedState = sessionStorage.getItem('canvasState');
-            if (savedState && canvas) {
-                try {
-                    const state = JSON.parse(savedState);
-                    canvas.offsetX = state.offsetX || 0;
-                    canvas.offsetY = state.offsetY || 0;
-                    canvas.scale = state.scale || 1;
-                    
-                    if (state.hasContent && currentFloorPlan) {
-                        canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
+                // Create canvas controller instance
+                canvasController = new UltimateCanvasController(canvasElement, {
+                    sharedScene: {
+                        getAllGeometries: () => {
+                            const geometries = [];
+
+                            // Add floor plan geometries
+                            if (currentFloorPlan && currentFloorPlan.walls) {
+                                currentFloorPlan.walls.forEach((wall, index) => {
+                                    geometries.push({
+                                        id: `wall_${index}`,
+                                        type: 'wall',
+                                        polygon: createWallPolygon(wall),
+                                        style: { color: '#6B7280', strokeWidth: 2, fill: true },
+                                        metadata: { layer: 'WALLS' }
+                                    });
+                                });
+                            }
+
+                            // Add îlots
+                            generatedIlots.forEach((ilot, index) => {
+                                geometries.push({
+                                    id: ilot.id || `ilot_${index}`,
+                                    type: 'ilot',
+                                    polygon: [[ilot.x, ilot.y], [ilot.x + ilot.width, ilot.y], 
+                                             [ilot.x + ilot.width, ilot.y + ilot.height], [ilot.x, ilot.y + ilot.height]],
+                                    bbox: { minX: ilot.x, minY: ilot.y, maxX: ilot.x + ilot.width, maxY: ilot.y + ilot.height },
+                                    style: { color: '#10b981', strokeColor: '#059669', strokeWidth: 2, fill: true, opacity: 0.8 },
+                                    metadata: { layer: 'ILOTS', capacity: ilot.capacity },
+                                    properties: { isValid: ilot.isValid }
+                                });
+                            });
+
+                            // Add corridors
+                            corridorNetwork.forEach((corridor, index) => {
+                                if (corridor.polygon) {
+                                    geometries.push({
+                                        id: corridor.id || `corridor_${index}`,
+                                        type: 'corridor',
+                                        polygon: corridor.polygon,
+                                        style: { color: '#f59e0b', strokeColor: '#d97706', strokeWidth: 1, fill: true, opacity: 0.6 },
+                                        metadata: { layer: 'CORRIDORS', width: corridor.width }
+                                    });
+                                }
+                            });
+
+                            return geometries;
+                        },
+                        getBounds: () => {
+                            if (currentFloorPlan && currentFloorPlan.bounds) {
+                                return currentFloorPlan.bounds;
+                            }
+                            return { minX: 0, minY: 0, maxX: 20, maxY: 15 };
+                        }
                     }
-                } catch (error) {
-                    console.log('Failed to restore canvas state:', error);
+                });
+
+                await canvasController.initialize();
+
+                // Fit to view if we have data
+                if (currentFloorPlan || generatedIlots.length > 0) {
+                    setTimeout(() => {
+                        canvasController.fitToView();
+                    }, 100);
                 }
+
+                console.log('✅ Manual Canvas View initialized successfully');
+
+            } catch (error) {
+                console.error('❌ Failed to initialize canvas view:', error);
+                showNotification('Failed to initialize canvas view', 'error');
             }
         }
 
-        function toggle3DWalkthrough() {
-            switchView('3d');
-            if (typeof viewer !== 'undefined' && viewer) {
-                const nav = viewer.navigation;
-                const toolName = 'firstperson';
-                if (nav.getActiveToolName() === toolName) {
-                    nav.deactivateTool(toolName);
-                } else {
-                    nav.activateTool(toolName);
-                }
-            } else {
-                showNotification('Please upload a CAD file first to enable 3D view', 'warning');
+        // Render current data on canvas
+        async function renderOnCanvas() {
+            if (!canvasController) return;
+
+            try {
+                console.log('🎨 Rendering data on canvas...');
+
+                // Trigger re-render
+                canvasController.scheduleRender();
+
+                // Fit to view
+                setTimeout(() => {
+                    canvasController.fitToView();
+                }, 100);
+
+            } catch (error) {
+                console.error('❌ Canvas rendering failed:', error);
             }
         }
 
-        // Sidebar Management
-        function setupSidebarToggles() {
-            document.getElementById('left-sidebar-toggle').addEventListener('click', () => {
-                const leftSidebar = document.getElementById('leftSidebar');
-                const rightSidebar = document.getElementById('rightSidebar');
-                const container = document.getElementById('appContainer');
+        // Helper function to create wall polygon from wall data
+        function createWallPolygon(wall) {
+            const thickness = wall.thickness || 0.2;
+            const halfThickness = thickness / 2;
 
-                leftSidebar.classList.toggle('collapsed');
-                updateGridLayout();
+            if (wall.x1 !== undefined && wall.y1 !== undefined && wall.x2 !== undefined && wall.y2 !== undefined) {
+                // Line-based wall
+                const dx = wall.x2 - wall.x1;
+                const dy = wall.y2 - wall.y1;
+                const length = Math.sqrt(dx * dx + dy * dy);
+
+                if (length === 0) return [[wall.x1, wall.y1], [wall.x1, wall.y1], [wall.x1, wall.y1], [wall.x1, wall.y1]];
+
+                const unitX = dx / length;
+                const unitY = dy / length;
+                const perpX = -unitY * halfThickness;
+                const perpY = unitX * halfThickness;
+
+                return [
+                    [wall.x1 + perpX, wall.y1 + perpY],
+                    [wall.x2 + perpX, wall.y2 + perpY],
+                    [wall.x2 - perpX, wall.y2 - perpY],
+                    [wall.x1 - perpX, wall.y1 - perpY]
+                ];
+            }
+
+            // Default rectangle
+            return [[0, 0], [1, 0], [1, thickness], [0, thickness]];
+        }
+
+        // Load floor plan data from analysis
+        async function loadFloorPlanData(urn) {
+            if (!urn) {
+                console.error('URN is missing, cannot load floor plan data.');
+                return;
+            }
+
+            updateStatus('Loading Floor Plan Data', 'Fetching analysis results...');
+            setProgress(70);
+
+            try {
+                const response = await fetch(`/api/floorplan/data?urn=${urn}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch floor plan data: ${response.statusText}`);
+                }
+                const data = await response.json();
+
+                currentFloorPlan = data.floorPlan;
+                generatedIlots = data.ilots || [];
+                corridorNetwork = data.corridors || [];
+
+                setProgress(90);
+
+                // Update UI elements
+                updateFloorPlanDetails();
+                updateElementsList();
+                updateIlotsList();
+                updateCorridorsList();
+                updateAnalysisStats();
+
+                // Render data if canvas view is active
+                if (currentViewMode === 'canvas' && canvasController) {
+                    await renderOnCanvas();
+                } else if (viewer) {
+                    // Visualize îlots and corridors on 3D model if Autodesk view is active
+                    visualizeIlotsOn3D();
+                    visualizeCorridorsOn3D(corridorNetwork);
+                }
+
+                hideStatusOverlay();
+                showNotification('Floor plan data loaded successfully', 'success');
+
+            } catch (error) {
+                console.error('Error loading floor plan data:', error);
+                hideStatusOverlay();
+                showNotification(`Failed to load floor plan data: ${error.message}`, 'error');
+            }
+        }
+
+        // Function to visualize îlots on the 3D model
+        function visualizeIlotsOn3D() {
+            if (!viewer || !generatedIlots.length) return;
+
+            console.log('🏗️ Visualizing îlots on 3D model...');
+
+            // Clear existing îlot overlays
+            clearIlotOverlays();
+
+            generatedIlots.forEach((ilot, index) => {
+                createIlot3DOverlay(ilot, index);
             });
 
-            document.getElementById('right-sidebar-toggle').addEventListener('click', () => {
-                const rightSidebar = document.getElementById('rightSidebar');
-                const container = document.getElementById('appContainer');
-
-                rightSidebar.classList.toggle('collapsed');
-                updateGridLayout();
-            });
+            showNotification(`${generatedIlots.length} îlots visualized on 3D model`, 'success');
         }
 
-        function updateGridLayout() {
-            const leftSidebar = document.getElementById('leftSidebar');
-            const rightSidebar = document.getElementById('rightSidebar');
-            const container = document.getElementById('appContainer');
+        // Function to create a 3D overlay for a single îlot
+        function createIlot3DOverlay(ilot, index) {
+            // Convert îlot coordinates to 3D world coordinates
+            const worldPos = convertToWorldCoordinates(ilot.x, ilot.y, 0);
 
-            const leftWidth = leftSidebar.classList.contains('collapsed') ? '0px' : '320px';
-            const rightWidth = rightSidebar.classList.contains('collapsed') ? '0px' : '380px';
-
-            container.style.gridTemplateColumns = `${leftWidth} 1fr ${rightWidth}`;
-        }
-
-        // Utility Functions
-        function updateStatus(title, subtitle = '', isError = false) {
-            const statusOverlay = document.getElementById('statusOverlay');
-            const statusText = document.getElementById('statusText');
-            const statusSubText = document.getElementById('statusSubText');
-
-            statusText.textContent = title;
-            statusSubText.textContent = subtitle;
-
-            if (isError) {
-                statusOverlay.style.background = 'rgba(239, 68, 68, 0.8)';
-            } else {
-                statusOverlay.style.background = 'rgba(0, 0, 0, 0.8)';
-            }
-
-            statusOverlay.classList.add('visible');
-        }
-
-        function hideStatusOverlay() {
-            const overlay = document.getElementById('statusOverlay');
-            if (overlay) {
-                overlay.classList.remove('visible');
-                setProgress(0); // Reset progress bar
-            }
-        }
-        
-        function minimizeStatus() {
-            // Implement logic to minimize status overlay, e.g., show only title or icon
-            const overlayContent = document.querySelector('#statusOverlay .status-overlay-content');
-            if (overlayContent) {
-                overlayContent.style.display = 'none'; // Hide content
-                // Optionally show a minimized indicator
-            }
-            showNotification('Status minimized', 'info', 2000);
-        }
-
-        function cancelCurrentOperation() {
-            // Implement logic to cancel the current operation
-            showNotification('Operation cancelled', 'warning');
-            hideStatusOverlay();
-        }
-
-        function setProgress(percentage) {
-            const progressFill = document.getElementById('statusProgressFill');
-            const progressPercentage = document.getElementById('statusPercentage');
-            if (progressFill && progressPercentage) {
-                progressFill.style.width = `${percentage}%`;
-                progressPercentage.textContent = `${Math.round(percentage)}%`;
-            }
-        }
-
-        function showNotification(message, type = 'info', duration = 4000) {
-            const notification = document.createElement('div');
-            notification.className = `notification notification-${type}`;
-
-            const icons = {
-                success: 'fa-check-circle',
-                error: 'fa-exclamation-circle',
-                warning: 'fa-exclamation-triangle',
-                info: 'fa-info-circle'
+            // Create 3D markup for îlot
+            const markup = {
+                id: `ilot-${index}`,
+                position: worldPos,
+                type: 'rectangle',
+                width: ilot.width * 100, // Convert to viewer units
+                height: ilot.height * 100,
+                color: getIlotColor(ilot.type),
+                opacity: 0.7,
+                data: ilot
             };
 
-            notification.innerHTML = `
-                <i class="fas ${icons[type]}"></i>
-                <span>${message}</span>
-            `;
-
-            document.body.appendChild(notification);
-
-            setTimeout(() => {
-                notification.style.transform = 'translateX(100%)';
-                notification.style.opacity = '0';
-                setTimeout(() => {
-                    if (notification.parentNode) {
-                        notification.parentNode.removeChild(notification);
-                    }
-                }, 300);
-            }, duration);
+            // Add to viewer as overlay
+            addMarkupToViewer(markup);
         }
 
-        // Autodesk Viewer Integration - Official Implementation
+        // Helper to convert 2D coordinates to 3D world coordinates for viewer overlays
+        function convertToWorldCoordinates(x, y, z) {
+            // This conversion is highly dependent on the specific model's coordinate system and scaling.
+            // A common approach is to scale and offset. Adjust these values as needed.
+            const scaleFactor = 100; // Example: Assume 1 unit in floor plan = 100 units in viewer
+            const zOffset = 10;     // Example: Place îlots slightly above the floor
+
+            return {
+                x: x * scaleFactor,
+                y: y * scaleFactor,
+                z: z + zOffset
+            };
+        }
+
+        // Get color based on îlot type
+        function getIlotColor(type) {
+            const colors = {
+                'Work': '#10B981',      // Green
+                'Meeting': '#3B82F6',   // Blue
+                'Social': '#8B5CF6',    // Purple
+                'Break': '#F59E0B'      // Orange
+            };
+            return colors[type] || '#10B981';
+        }
+
+        // Function to add markup (like îlots) to the viewer overlay
+        function addMarkupToViewer(markup) {
+            // Create HTML overlay element
+            const overlay = document.createElement('div');
+            overlay.id = markup.id;
+            overlay.style.cssText = `
+                position: absolute;
+                width: ${markup.width}px;
+                height: ${markup.height}px;
+                background: ${markup.color};
+                opacity: ${markup.opacity};
+                border: 2px solid #fff;
+                border-radius: 4px;
+                pointer-events: auto;
+                cursor: pointer;
+                z-index: 1000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+            `;
+
+            overlay.innerHTML = `
+                <div>
+                    ${markup.data.type}<br>
+                    Cap: ${markup.data.capacity}
+                </div>
+            `;
+
+            // Add click handler
+            overlay.onclick = () => {
+                showIlotDetails(markup.data);
+            };
+
+            // Position overlay on screen
+            const screenPos = worldToScreen(markup.position);
+            if (screenPos) {
+                overlay.style.left = (screenPos.x - markup.width/2) + 'px';
+                overlay.style.top = (screenPos.y - markup.height/2) + 'px';
+
+                document.getElementById('forgeViewer').appendChild(overlay);
+
+                // Store reference for updates
+                if (!window.ilotOverlays) window.ilotOverlays = [];
+                window.ilotOverlays.push({
+                    element: overlay,
+                    worldPos: markup.position,
+                    data: markup.data
+                });
+            }
+        }
+
+        // Helper to convert 3D world coordinates to screen coordinates
+        function worldToScreen(worldPos) {
+            if (!viewer || !viewer.impl) return null;
+
+            try {
+                const screenPos = viewer.impl.worldToClient(new THREE.Vector3(worldPos.x, worldPos.y, worldPos.z));
+                return { x: screenPos.x, y: screenPos.y };
+            } catch (error) {
+                console.log('World to screen conversion failed:', error);
+                return null;
+            }
+        }
+
+        // Function to clear all îlot overlays from the viewer
+        function clearIlotOverlays() {
+            if (window.ilotOverlays) {
+                window.ilotOverlays.forEach(overlay => {
+                    if (overlay.element.parentNode) {
+                        overlay.element.parentNode.removeChild(overlay.element);
+                    }
+                });
+                window.ilotOverlays = [];
+            }
+        }
+
+        // Function to display details of an îlot when clicked
+        function showIlotDetails(ilot) {
+            const details = `
+                <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 300px;">
+                    <h4 style="margin: 0 0 10px 0; color: #2563eb;">${ilot.type} Îlot</h4>
+                    <div><strong>Capacity:</strong> ${ilot.capacity} people</div>
+                    <div><strong>Dimensions:</strong> ${ilot.width}m × ${ilot.height}m</div>
+                    <div><strong>Area:</strong> ${(ilot.width * ilot.height).toFixed(1)}m²</div>
+                    <div><strong>Position:</strong> X:${ilot.x.toFixed(1)}, Y:${ilot.y.toFixed(1)}</div>
+                    <div><strong>Room:</strong> ${ilot.roomName || 'N/A'}</div>
+                    <button onclick="this.parentElement.parentElement.remove()" style="margin-top: 10px; padding: 5px 10px; background: #2563eb; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>
+                </div>
+            `;
+
+            const popup = document.createElement('div');
+            popup.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                z-index: 2000;
+            `;
+            popup.innerHTML = details;
+
+            document.getElementById('forgeViewer').appendChild(popup);
+        }
+
+        // Function to apply color coding to elements in the 3D model
+        function applyElementColorCoding() {
+            if (!viewer || !viewer.model) return;
+
+            console.log('🎨 Applying element color coding...');
+
+            // Get all object IDs in the model
+            viewer.model.getObjectTree(function(objectTree) {
+                objectTree.enumNodeChildren(objectTree.getRootId(), function(dbId) {
+                    viewer.getProperties(dbId, function(props) {
+                        const color = getElementColor(props);
+                        if (color) {
+                            viewer.setThemingColor(dbId, color);
+                        }
+                    });
+                }, true);
+            });
+        }
+
+        // Helper to get color based on element properties
+        function getElementColor(properties) {
+            const name = properties.name?.toLowerCase() || '';
+            const category = getCategoryFromProperties(properties);
+
+            // Color coding based on element type
+            if (category === 'wall' || name.includes('wall')) {
+                return new THREE.Vector4(0.42, 0.45, 0.5, 1); // Gray
+            } else if (category === 'door' || name.includes('door')) {
+                return new THREE.Vector4(0.94, 0.27, 0.27, 1); // Red
+            } else if (category === 'window' || name.includes('window')) {
+                return new THREE.Vector4(0.23, 0.51, 0.96, 1); // Blue
+            } else if (category === 'floor' || name.includes('floor')) {
+                return new THREE.Vector4(0.9, 0.9, 0.9, 1); // Light gray
+            }
+
+            return null; // Keep original color
+        }
+
+        // Helper to extract category from element properties
+        function getCategoryFromProperties(properties) {
+            for (let prop of properties.properties) {
+                if (prop.displayName === 'Category' || prop.displayName === 'Type') {
+                    return prop.displayValue.toLowerCase();
+                }
+            }
+            return '';
+        }
+
+        // Function to highlight selected element and show its properties
+        function highlightSelectedElement(dbId) {
+            viewer.getProperties(dbId, function(props) {
+                const info = `
+                    <div style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 6px; max-width: 250px; z-index: 1500;">
+                        <h5 style="margin: 0 0 8px 0;">${props.name}</h5>
+                        ${props.properties.slice(0, 5).map(p => `<div><strong>${p.displayName}:</strong> ${p.displayValue}</div>`).join('')}
+                        <button onclick="this.parentElement.remove()" style="margin-top: 8px; padding: 4px 8px; background: #fff; color: #000; border: none; border-radius: 3px; cursor: pointer;">×</button>
+                    </div>
+                `;
+
+                // Remove existing info panels
+                document.querySelectorAll('#forgeViewer > div[style*="position: absolute"]').forEach(el => {
+                    if (el.innerHTML.includes('displayName')) el.remove();
+                });
+
+                const infoPanel = document.createElement('div');
+                infoPanel.innerHTML = info;
+                document.getElementById('forgeViewer').appendChild(infoPanel);
+            });
+        }
+
+        // Update îlot overlay positions when camera moves
+        function updateIlotOverlayPositions() {
+            if (!window.ilotOverlays || !viewer) return;
+
+            window.ilotOverlays.forEach(overlay => {
+                const screenPos = worldToScreen(overlay.worldPos);
+                if (screenPos) {
+                    overlay.element.style.left = (screenPos.x - overlay.element.offsetWidth/2) + 'px';
+                    overlay.element.style.top = (screenPos.y - overlay.element.offsetHeight/2) + 'px';
+                }
+            });
+        }
+
+        // Set up camera change listener for overlay updates
+        function setupCameraListener() {
+            if (viewer && viewer.navigation) {
+                viewer.navigation.addEventListener('cameraChanged', updateIlotOverlayPositions);
+            }
+        }
+
+        // Suppress browser extension errors
+        window.addEventListener('error', function(e) {
+            if (e.filename && (e.filename.includes('content.js') || e.filename.includes('extension'))) {
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        // Force hide status function
+        function forceHideStatus() {
+            const overlay = document.getElementById('statusOverlay');
+            if (overlay) {
+                overlay.style.display = 'none';
+                overlay.style.visibility = 'hidden';
+            }
+            showNotification('Status overlay cleared', 'info');
+        }
+
+        // Auto-hide status after 30 seconds
+        function setupStatusTimeout() {
+            setTimeout(() => {
+                const overlay = document.getElementById('statusOverlay');
+                if (overlay && overlay.classList.contains('visible')) {
+                    console.log('Auto-hiding stuck status overlay');
+                    hideStatusOverlay();
+                }
+            }, 30000);
+        }
+
+        // Initialize view mode and load viewer
+        function loadForgeViewer() {
+            // Initialize viewer only when needed (i.e., when switching to Autodesk view)
+            // This prevents initialization errors if WebGL is not supported.
+            console.log('Autodesk Viewer initialization scheduled.');
+        }
+
+        // Initialize application on page load
+        window.addEventListener('load', () => {
+            console.log('FloorPlan Pro - Production CAD Analysis Engine Loaded');
+            showNotification('FloorPlan Pro ready for professional CAD analysis', 'success');
+            setupStatusTimeout();
+
+            // Initial view mode
+            currentViewMode = 'autodesk'; 
+
+            // Restore canvas state if available and if the initial view is canvas
+            // (This logic might need adjustment if the default view changes)
+            // setTimeout(() => {
+            //     if (currentViewMode === 'canvas') {
+            //         restoreCanvasState();
+            //     }
+            // }, 500);
+        });
+
+        // Restore canvas state from session storage
+        // function restoreCanvasState() {
+        //     const savedState = sessionStorage.getItem('canvasState');
+        //     if (savedState && canvasController) {
+        //         try {
+        //             const state = JSON.parse(savedState);
+        //             canvasController.camera.x = state.offsetX || 0;
+        //             canvasController.camera.y = state.offsetY || 0;
+        //             canvasController.camera.zoom = state.scale || 1;
+
+        //             if (state.hasContent && (currentFloorPlan || generatedIlots.length > 0)) {
+        //                 canvasController.scheduleRender();
+        //             }
+        //         } catch (error) {
+        //             console.log('Failed to restore canvas state:', error);
+        //         }
+        //     }
+        // }
+
+
+        // --- Autodesk Viewer Integration ---
         async function initializeViewer(urn) {
             console.log('🎯 Initializing Autodesk Viewer for URN:', urn);
 
@@ -3664,6 +3679,12 @@
                                     visualizeIlotsOn3D();
                                 }
 
+                                // Show corridors if generated
+                                if (corridorNetwork.length > 0) {
+                                    visualizeCorridorsOn3D(corridorNetwork);
+                                }
+
+
                                 // Setup camera listener for overlay updates
                                 setupCameraListener();
 
@@ -3695,8 +3716,6 @@
                 });
             });
         }
-
-
 
         async function getForgeToken(callback) {
             try {
@@ -4163,145 +4182,506 @@
             }
         }
 
-        // 3D Visualization Functions
-        function applyElementColorCoding() {
-            if (!viewer || !viewer.model) return;
+        // Visualize corridors on the 3D model
+        function visualizeCorridorsOn3D(corridors) {
+            if (!viewer || !corridors || !corridors.length) return;
 
-            // Get all object IDs
-            viewer.model.getObjectTree(function(tree) {
-                tree.enumNodeChildren(tree.getRootId(), function(dbId) {
-                    viewer.getProperties(dbId, function(props) {
-                        const layerName = getLayerName(props);
-                        const color = getColorForLayer(layerName);
+            console.log(`🏢 Visualizing ${corridors.length} corridors on 3D model...`);
 
-                        if (color) {
-                            viewer.setThemingColor(dbId, color);
-                        }
-                    });
-                }, true);
+            // Clear existing corridor overlays
+            clearCorridorOverlays();
+
+            corridors.forEach((corridor, index) => {
+                createCorridor3DOverlay(corridor, index);
             });
+
+            showNotification(`${corridors.length} corridors visualized on 3D model`, 'success');
         }
 
-        function getLayerName(properties) {
-            for (let prop of properties.properties) {
-                if (prop.displayName.toLowerCase().includes('layer')) {
-                    return prop.displayValue.toLowerCase();
-                }
-            }
-            return '';
-        }
+        // Function to create a 3D overlay for a single corridor
+        function createCorridor3DOverlay(corridor, index) {
+            if (!corridor.polygon || corridor.polygon.length < 3) return;
 
-        function getColorForLayer(layerName) {
-            const colorMap = {
-                'wall': new THREE.Vector4(0.42, 0.45, 0.5, 1), // Gray
-                'door': new THREE.Vector4(0.94, 0.27, 0.27, 1), // Red
-                'window': new THREE.Vector4(0.2, 0.6, 0.9, 1), // Blue
-                'restricted': new THREE.Vector4(0.23, 0.51, 0.96, 1) // Blue
+            // Convert corridor polygon to 3D coordinates
+            const worldPolygon = corridor.polygon.map(point => convertToWorldCoordinates(point[0], point[1], 0));
+
+            // Create a 3D mesh for the corridor
+            const shape = new THREE.Shape(worldPolygon.map(p => new THREE.Vector2(p.x, p.y)));
+            const geometry = new THREE.ShapeBufferGeometry(shape);
+
+            // Extrude the shape to give it thickness (height in 3D)
+            const extrudeSettings = {
+                steps: 1,
+                depth: 15, // Example height, adjust as needed
+                bevelEnabled: false
             };
+            const extrudedGeometry = new THREE.ExtrudeBufferGeometry(shape, extrudeSettings);
 
-            for (let key in colorMap) {
-                if (layerName.includes(key)) {
-                    return colorMap[key];
-                }
-            }
-            return null;
-        }
-
-        function visualizeIlotsOn3D() {
-            if (!viewer || !generatedIlots.length) return;
-
-            console.log('🏢 Visualizing', generatedIlots.length, 'îlots on 3D model');
-
-            // Create overlay for îlots
-            const overlayScene = new THREE.Scene();
-
-            generatedIlots.forEach((ilot, index) => {
-                // Create îlot geometry
-                const geometry = new THREE.BoxGeometry(ilot.width || 2, ilot.height || 1.5, 0.1);
-
-                // Color by type
-                const colors = {
-                    'Work': '#10B981',
-                    'Meeting': '#3B82F6',
-                    'Social': '#8B5CF6',
-                    'Break': '#F59E0B'
-                };
-
-                const material = new THREE.MeshBasicMaterial({ 
-                    color: colors[ilot.type] || '#10B981',
-                    transparent: true,
-                    opacity: 0.7
-                });
-
-                const mesh = new THREE.Mesh(geometry, material);
-
-                // Position îlot
-                mesh.position.set(
-                    (ilot.x || 0) + (ilot.width || 2) / 2,
-                    (ilot.y || 0) + (ilot.height || 1.5) / 2,
-                    0.05
-                );
-
-                overlayScene.add(mesh);
-
-                // Add label
-                const labelDiv = document.createElement('div');
-                labelDiv.className = 'ilot-label';
-                labelDiv.style.cssText = `
-                    position: absolute;
-                    background: rgba(16, 185, 129, 0.9);
-                    color: white;
-                    padding: 4px 8px;
-                    border-radius: 4px;
-                    font-size: 12px;
-                    font-weight: 600;
-                    pointer-events: none;
-                    z-index: 1000;
-                `;
-                labelDiv.textContent = `${ilot.type} (${ilot.capacity})`;
-
-                // Position label on screen
-                const screenPos = worldToScreen(mesh.position);
-                if (screenPos) {
-                    labelDiv.style.left = screenPos.x + 'px';
-                    labelDiv.style.top = screenPos.y + 'px';
-                    document.getElementById('forgeViewer').appendChild(labelDiv);
-                }
+            const material = new THREE.MeshBasicMaterial({
+                color: corridor.style?.color || '#f59e0b', // Use corridor color or default
+                opacity: corridor.style?.opacity || 0.6,
+                transparent: true
             });
 
-            // Add overlay to viewer
-            if (viewer.impl && viewer.impl.overlayScenes) {
-                viewer.impl.overlayScenes['ilots'] = overlayScene;
+            const mesh = new THREE.Mesh(extrudedGeometry, material);
+            mesh.position.z = 5; // Adjust Z position if needed
+
+            // Add to viewer overlay scene
+            if (!viewer.impl.overlayScenes['corridors']) {
+                viewer.impl.overlayScenes['corridors'] = new THREE.Scene();
+            }
+            viewer.impl.overlayScenes['corridors'].add(mesh);
+
+            // Store reference for updates/removal
+            if (!window.corridorOverlays) window.corridorOverlays = [];
+            window.corridorOverlays.push({
+                element: mesh,
+                worldPolygon: worldPolygon
+            });
+        }
+
+        // Function to clear all corridor overlays
+        function clearCorridorOverlays() {
+            if (window.corridorOverlays && viewer.impl.overlayScenes['corridors']) {
+                window.corridorOverlays.forEach(overlay => {
+                    viewer.impl.overlayScenes['corridors'].remove(overlay.element);
+                });
+                window.corridorOverlays = [];
                 viewer.impl.invalidate(true);
             }
-
-            showNotification(`Visualized ${generatedIlots.length} îlots on 3D model`, 'success');
         }
 
-        function worldToScreen(worldPos) {
-            if (!viewer || !viewer.impl) return null;
+        // Helper to get color based on corridor type or default
+        // function getCorridorColor(type) {
+        //     const colors = {
+        //         'main': '#FF0000',   // Red for main corridors
+        //         'secondary': '#00FF00' // Green for secondary
+        //     };
+        //     return colors[type] || '#FFFF00'; // Yellow default
+        // }
 
-            const camera = viewer.impl.camera;
-            const canvas = viewer.impl.canvas;
+        // MVC-like structure for managing different parts of the application
+        // (This is a conceptual outline, actual implementation might differ)
+        // View Manager
+        class ViewManager {
+            constructor() {
+                this.currentView = 'autodesk';
+            }
 
-            const vector = new THREE.Vector3(worldPos.x, worldPos.y, worldPos.z);
-            vector.project(camera);
+            switchToAutodesk() {
+                this.currentView = 'autodesk';
+                // Show Autodesk viewer, hide canvas
+                document.getElementById('forgeViewer').style.display = 'block';
+                document.getElementById('floorPlanCanvas').style.display = 'none';
+                // Update button states
+                document.getElementById('autodeskViewBtn').classList.add('active');
+                document.getElementById('canvasViewBtn').classList.remove('active');
+            }
 
-            return {
-                x: (vector.x + 1) / 2 * canvas.clientWidth,
-                y: -(vector.y - 1) / 2 * canvas.clientHeight
+            switchToCanvas() {
+                this.currentView = 'canvas';
+                // Show canvas, hide Autodesk viewer
+                document.getElementById('forgeViewer').style.display = 'none';
+                document.getElementById('floorPlanCanvas').style.display = 'block';
+                // Update button states
+                document.getElementById('autodeskViewBtn').classList.remove('active');
+                document.getElementById('canvasViewBtn').classList.add('active');
+                // Initialize or render on canvas
+                if (!canvasController) {
+                    initializeCanvasView();
+                } else {
+                    canvasController.setVisible(true);
+                    renderOnCanvas();
+                }
+            }
+        }
+
+        // UltimateCanvasController class for manual canvas view
+        class UltimateCanvasController {
+            constructor(canvas, parent) {
+                this.canvas = canvas;
+                this.parent = parent;
+                this.ctx = canvas.getContext('2d');
+                this.camera = { x: 0, y: 0, zoom: 1 };
+                this.isVisible = true;
+                this.needsRender = true;
+                this.dpr = window.devicePixelRatio || 1; // Device pixel ratio
+            }
+
+            async initialize() {
+                this.setupCanvas();
+                this.setupEventHandlers();
+                this.scheduleRender();
+            }
+
+            setupCanvas() {
+                const rect = this.canvas.getBoundingClientRect();
+
+                this.canvas.width = rect.width * this.dpr;
+                this.canvas.height = rect.height * this.dpr;
+                this.canvas.style.width = rect.width + 'px';
+                this.canvas.style.height = rect.height + 'px';
+
+                this.ctx.scale(this.dpr, this.dpr);
+            }
+
+            setupEventHandlers() {
+                let isDragging = false;
+                let lastPos = { x: 0, y: 0 };
+
+                this.canvas.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    lastPos = { x: e.clientX, y: e.clientY };
+                    this.canvas.style.cursor = 'grabbing';
+                    e.preventDefault(); // Prevent default drag behavior
+                });
+
+                this.canvas.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        const dx = e.clientX - lastPos.x;
+                        const dy = e.clientY - lastPos.y;
+                        // Adjust camera position based on drag delta and current zoom
+                        this.camera.x -= dx / this.camera.zoom;
+                        this.camera.y -= dy / this.camera.zoom;
+                        lastPos = { x: e.clientX, y: e.clientY };
+                        this.scheduleRender();
+                    }
+                });
+
+                this.canvas.addEventListener('mouseup', () => {
+                    isDragging = false;
+                    this.canvas.style.cursor = 'grab';
+                });
+
+                this.canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1; // Zoom out or in
+                    const newZoom = this.camera.zoom * zoomFactor;
+                    // Clamp zoom level
+                    this.camera.zoom = Math.max(0.1, Math.min(10, newZoom));
+                    this.scheduleRender();
+                });
+
+                // Handle context menu to prevent default behavior (e.g., right-click menu)
+                this.canvas.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                });
+            }
+
+            scheduleRender() {
+                if (!this.needsRender) {
+                    this.needsRender = true;
+                    requestAnimationFrame(() => this.render());
+                }
+            }
+
+            render() {
+                if (!this.isVisible) return;
+
+                this.needsRender = false;
+                const rect = this.canvas.getBoundingClientRect();
+
+                // Clear canvas with high-DPI scaling
+                this.ctx.clearRect(0, 0, rect.width, rect.height);
+                this.ctx.fillStyle = '#f8fafc'; // Background color
+                this.ctx.fillRect(0, 0, rect.width, rect.height);
+
+                this.ctx.save();
+
+                // Apply camera transform (translation and scaling)
+                // Center the view on the camera's target position
+                this.ctx.translate(rect.width / 2, rect.height / 2);
+                this.ctx.scale(this.camera.zoom, this.camera.zoom);
+                this.ctx.translate(-this.camera.x, -this.camera.y);
+
+                // Render geometries from the shared scene
+                const geometries = this.parent?.sharedScene?.getAllGeometries() || [];
+
+                for (const geometry of geometries) {
+                    this.renderGeometry(geometry);
+                }
+
+                this.ctx.restore();
+
+                // Render UI elements (like zoom level, position)
+                this.renderUI(rect);
+            }
+
+            renderGeometry(geometry) {
+                if (!geometry.polygon || geometry.polygon.length === 0) return;
+
+                this.ctx.save();
+
+                const style = geometry.style || {};
+
+                this.ctx.beginPath();
+                const polygon = geometry.polygon;
+                this.ctx.moveTo(polygon[0][0], polygon[0][1]);
+
+                for (let i = 1; i < polygon.length; i++) {
+                    this.ctx.lineTo(polygon[i][0], polygon[i][1]);
+                }
+                this.ctx.closePath();
+
+                // Fill the shape
+                if (style.fill !== false) {
+                    this.ctx.fillStyle = style.color || '#ccc';
+                    this.ctx.globalAlpha = style.opacity || 0.8;
+                    this.ctx.fill();
+                }
+
+                // Stroke the shape
+                this.ctx.strokeStyle = style.strokeColor || style.color || '#333';
+                // Adjust lineWidth based on zoom level to maintain visual thickness
+                this.ctx.lineWidth = (style.strokeWidth || 1) / this.camera.zoom;
+                this.ctx.globalAlpha = 1; // Reset alpha for stroke
+                this.ctx.stroke();
+
+                this.ctx.restore();
+            }
+
+            renderUI(rect) {
+                this.ctx.fillStyle = '#1f2937'; // Text color
+                this.ctx.font = '12px Inter'; // Font style
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`Zoom: ${this.camera.zoom.toFixed(2)}x`, 10, 20);
+                this.ctx.fillText(`Position: ${this.camera.x.toFixed(1)}, ${this.camera.y.toFixed(1)}`, 10, 35);
+            }
+
+            fitToView() {
+                const bounds = this.parent?.sharedScene?.getBounds();
+                if (!bounds || (bounds.maxX - bounds.minX === 0) || (bounds.maxY - bounds.minY === 0)) {
+                    console.warn('Cannot fit to view: Invalid bounds or no data.');
+                    return;
+                }
+
+                const rect = this.canvas.getBoundingClientRect();
+                const padding = 50; // Padding around the content
+
+                const boundsWidth = bounds.maxX - bounds.minX;
+                const boundsHeight = bounds.maxY - bounds.minY;
+
+                // Calculate scale to fit bounds within canvas dimensions, considering padding
+                const scaleX = (rect.width - padding * 2) / boundsWidth;
+                const scaleY = (rect.height - padding * 2) / boundsHeight;
+
+                // Use the minimum scale to fit both dimensions, and clamp zoom
+                this.camera.zoom = Math.min(scaleX, scaleY, 10); // Max zoom level of 10
+
+                // Center the camera on the bounds' center
+                this.camera.x = (bounds.minX + bounds.maxX) / 2;
+                this.camera.y = (bounds.minY + bounds.maxY) / 2;
+
+                this.scheduleRender();
+            }
+
+            setVisible(visible) {
+                this.isVisible = visible;
+                if (visible) {
+                    this.canvas.style.visibility = 'visible';
+                    this.scheduleRender();
+                } else {
+                    this.canvas.style.visibility = 'hidden';
+                }
+            }
+        }
+
+
+        // --- Utility Functions ---
+        function updateStatus(title, subtitle = '', isError = false) {
+            const statusOverlay = document.getElementById('statusOverlay');
+            const statusText = document.getElementById('statusText');
+            const statusSubText = document.getElementById('statusSubText');
+
+            statusText.textContent = title;
+            statusSubText.textContent = subtitle;
+
+            if (isError) {
+                statusOverlay.style.background = 'rgba(239, 68, 68, 0.8)'; // Red for errors
+            } else {
+                statusOverlay.style.background = 'rgba(0, 0, 0, 0.8)'; // Default dark overlay
+            }
+
+            statusOverlay.classList.add('visible');
+        }
+
+        function hideStatusOverlay() {
+            const overlay = document.getElementById('statusOverlay');
+            if (overlay) {
+                overlay.classList.remove('visible');
+                setProgress(0); // Reset progress bar
+            }
+        }
+
+        function minimizeStatus() {
+            // Implement logic to minimize status overlay, e.g., show only title or icon
+            const overlayContent = document.querySelector('#statusOverlay .status-overlay-content');
+            if (overlayContent) {
+                overlayContent.style.display = 'none'; // Hide content
+                // Optionally show a minimized indicator
+            }
+            showNotification('Status minimized', 'info', 2000);
+        }
+
+        function cancelCurrentOperation() {
+            // Implement logic to cancel the current operation
+            showNotification('Operation cancelled', 'warning');
+            hideStatusOverlay();
+        }
+
+        function setProgress(percentage) {
+            const progressFill = document.getElementById('statusProgressFill');
+            const progressPercentage = document.getElementById('statusPercentage');
+            if (progressFill && progressPercentage) {
+                progressFill.style.width = `${percentage}%`;
+                progressPercentage.textContent = `${Math.round(percentage)}%`;
+            }
+        }
+
+        function showNotification(message, type = 'info', duration = 4000) {
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+
+            const icons = {
+                success: 'fa-check-circle',
+                error: 'fa-exclamation-circle',
+                warning: 'fa-exclamation-triangle',
+                info: 'fa-info-circle'
             };
+
+            notification.innerHTML = `
+                <i class="fas ${icons[type]}"></i>
+                <span>${message}</span>
+            `;
+
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.transform = 'translateX(100%)';
+                notification.style.opacity = '0';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, duration);
         }
 
-        function highlightSelectedElement(dbId) {
-            viewer.getProperties(dbId, function(props) {
-                console.log('Selected element:', props.name);
+        // Sidebar Management
+        function setupSidebarToggles() {
+            document.getElementById('left-sidebar-toggle').addEventListener('click', () => {
+                const leftSidebar = document.getElementById('leftSidebar');
+                leftSidebar.classList.toggle('collapsed');
+                updateGridLayout();
+            });
 
-                // Show properties in notification
-                const layerName = getLayerName(props);
-                showNotification(`Selected: ${props.name} (Layer: ${layerName})`, 'info', 3000);
+            document.getElementById('right-sidebar-toggle').addEventListener('click', () => {
+                const rightSidebar = document.getElementById('rightSidebar');
+                rightSidebar.classList.toggle('collapsed');
+                updateGridLayout();
             });
         }
+
+        function updateGridLayout() {
+            const leftSidebar = document.getElementById('leftSidebar');
+            const rightSidebar = document.getElementById('rightSidebar');
+            const container = document.getElementById('appContainer');
+
+            const leftWidth = leftSidebar.classList.contains('collapsed') ? '0px' : '320px';
+            const rightWidth = rightSidebar.classList.contains('collapsed') ? '0px' : '380px';
+
+            container.style.gridTemplateColumns = `${leftWidth} 1fr ${rightWidth}`;
+        }
+
+        // View switching with proper canvas initialization
+        document.getElementById('autodeskViewBtn').addEventListener('click', () => {
+            currentViewMode = 'autodesk';
+            document.getElementById('forgeViewer').style.display = 'block';
+            document.getElementById('floorPlanCanvas').style.display = 'none';
+            document.getElementById('autodeskViewBtn').classList.add('active');
+            document.getElementById('canvasViewBtn').classList.remove('active');
+
+            // Hide canvas controller if it exists
+            if (canvasController) {
+                canvasController.setVisible(false);
+            }
+
+            // Resize viewer and fit to view
+            if (viewer) {
+                viewer.resize();
+                viewer.fitToView();
+            }
+
+            console.log('Switched to Autodesk View');
+        });
+
+        document.getElementById('canvasViewBtn').addEventListener('click', async () => {
+            currentViewMode = 'canvas';
+            document.getElementById('forgeViewer').style.display = 'none';
+            document.getElementById('floorPlanCanvas').style.display = 'block';
+            document.getElementById('autodeskViewBtn').classList.remove('active');
+            document.getElementById('canvasViewBtn').classList.add('active');
+
+            // Initialize canvas controller if not already done
+            if (!canvasController) {
+                await initializeCanvasView();
+            } else {
+                canvasController.setVisible(true);
+                // Re-render current data
+                if (currentFloorPlan || generatedIlots.length > 0) {
+                    await renderOnCanvas();
+                }
+            }
+
+            console.log('Switched to Manual Canvas View');
+        });
+
+        // Switch view function (used internally or by other components)
+        function switchView(view) {
+            switch (view) {
+                case 'render':
+                case 'canvas':
+                    switchToCanvasView();
+                    break;
+                case 'analysis':
+                case '3d':
+                    switchToAutodeskView();
+                    break;
+                default:
+                    switchToAutodeskView();
+                    break;
+            }
+        }
+
+        // Legacy view function for compatibility
+        // function switchView(view) {
+        //     switch (view) {
+        //         case 'render':
+        //         case 'canvas':
+        //             switchToCanvasView();
+        //             break;
+        //         case 'analysis':
+        //         case '3d':
+        //             switchToAutodeskView();
+        //             break;
+        //         default:
+        //             switchToAutodeskView();
+        //             break;
+        //     }
+        // }
+
+        // Canvas state preservation
+        // function preserveCanvasState() {
+        //     if (canvasController && currentFloorPlan) {
+        //         const canvasState = {
+        //             offsetX: canvasController.camera.x,
+        //             offsetY: canvasController.camera.y,
+        //             scale: canvasController.camera.zoom,
+        //             hasContent: true
+        //         };
+        //         sessionStorage.setItem('canvasState', JSON.stringify(canvasState));
+        //     }
+        // }
 
         // 3D Visualization Functions for Precise Îlot Placement
         function visualizeIlotsOn3D() {
@@ -4319,6 +4699,7 @@
             showNotification(`${generatedIlots.length} îlots visualized on 3D model`, 'success');
         }
 
+        // Function to create a 3D overlay for a single îlot
         function createIlot3DOverlay(ilot, index) {
             // Convert îlot coordinates to 3D world coordinates
             const worldPos = convertToWorldCoordinates(ilot.x, ilot.y, 0);
@@ -4339,16 +4720,21 @@
             addMarkupToViewer(markup);
         }
 
+        // Helper to convert 2D coordinates to 3D world coordinates for viewer overlays
         function convertToWorldCoordinates(x, y, z) {
-            // Convert floor plan coordinates to 3D world coordinates
-            // This needs to be calibrated based on your model's coordinate system
+            // This conversion is highly dependent on the specific model's coordinate system and scaling.
+            // A common approach is to scale and offset. Adjust these values as needed.
+            const scaleFactor = 100; // Example: Assume 1 unit in floor plan = 100 units in viewer
+            const zOffset = 10;     // Example: Place îlots slightly above the floor
+
             return {
-                x: x * 100, // Scale factor - adjust based on your model
-                y: y * 100,
-                z: z + 10   // Slightly above floor level
+                x: x * scaleFactor,
+                y: y * scaleFactor,
+                z: z + zOffset
             };
         }
 
+        // Get color based on îlot type
         function getIlotColor(type) {
             const colors = {
                 'Work': '#10B981',      // Green
@@ -4359,6 +4745,7 @@
             return colors[type] || '#10B981';
         }
 
+        // Function to add markup (like îlots) to the viewer overlay
         function addMarkupToViewer(markup) {
             // Create HTML overlay element
             const overlay = document.createElement('div');
@@ -4412,6 +4799,7 @@
             }
         }
 
+        // Helper to convert 3D world coordinates to screen coordinates
         function worldToScreen(worldPos) {
             if (!viewer || !viewer.impl) return null;
 
@@ -4424,6 +4812,7 @@
             }
         }
 
+        // Function to clear all îlot overlays from the viewer
         function clearIlotOverlays() {
             if (window.ilotOverlays) {
                 window.ilotOverlays.forEach(overlay => {
@@ -4435,6 +4824,7 @@
             }
         }
 
+        // Function to display details of an îlot when clicked
         function showIlotDetails(ilot) {
             const details = `
                 <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 300px;">
@@ -4461,6 +4851,7 @@
             document.getElementById('forgeViewer').appendChild(popup);
         }
 
+        // Function to apply color coding to elements in the 3D model
         function applyElementColorCoding() {
             if (!viewer || !viewer.model) return;
 
@@ -4479,24 +4870,26 @@
             });
         }
 
+        // Helper to get color based on element properties
         function getElementColor(properties) {
             const name = properties.name?.toLowerCase() || '';
             const category = getCategoryFromProperties(properties);
 
             // Color coding based on element type
             if (category === 'wall' || name.includes('wall')) {
-                return new THREE.Vector4(0.42, 0.45, 0.5, 1); // Gray for walls
+                return new THREE.Vector4(0.42, 0.45, 0.5, 1); // Gray
             } else if (category === 'door' || name.includes('door')) {
-                return new THREE.Vector4(0.94, 0.27, 0.27, 1); // Red for doors
+                return new THREE.Vector4(0.94, 0.27, 0.27, 1); // Red
             } else if (category === 'window' || name.includes('window')) {
-                return new THREE.Vector4(0.23, 0.51, 0.96, 1); // Blue for windows
+                return new THREE.Vector4(0.23, 0.51, 0.96, 1); // Blue
             } else if (category === 'floor' || name.includes('floor')) {
-                return new THREE.Vector4(0.9, 0.9, 0.9, 1); // Light gray for floors
+                return new THREE.Vector4(0.9, 0.9, 0.9, 1); // Light gray
             }
 
             return null; // Keep original color
         }
 
+        // Helper to extract category from element properties
         function getCategoryFromProperties(properties) {
             for (let prop of properties.properties) {
                 if (prop.displayName === 'Category' || prop.displayName === 'Type') {
@@ -4506,6 +4899,7 @@
             return '';
         }
 
+        // Function to highlight selected element and show its properties
         function highlightSelectedElement(dbId) {
             viewer.getProperties(dbId, function(props) {
                 const info = `
@@ -4527,7 +4921,7 @@
             });
         }
 
-        // Update îlot positions when camera moves
+        // Update îlot overlay positions when camera moves
         function updateIlotOverlayPositions() {
             if (!window.ilotOverlays || !viewer) return;
 
@@ -4576,22 +4970,13 @@
             }, 30000);
         }
 
-        // Initialize application on page load
-        window.addEventListener('load', () => {
-            console.log('FloorPlan Pro - Production CAD Analysis Engine Loaded');
-            showNotification('FloorPlan Pro ready for professional CAD analysis', 'success');
-            setupStatusTimeout();
-            
-            // Initialize view state
-            currentView = 'autodesk'; // Start with autodesk view
-            
-            // Restore canvas state if available
-            setTimeout(() => {
-                if (currentView === 'canvas') {
-                    restoreCanvasState();
-                }
-            }, 500);
-        });
+        // Initialize viewer
+        function loadForgeViewer() {
+            // Viewer initialization is handled within initializeViewer when a file is loaded.
+            // This function acts as a placeholder to ensure it's called appropriately.
+            console.log('Autodesk Viewer initialization triggered by file upload.');
+        }
+
     </script>
 </body>
 </html>
