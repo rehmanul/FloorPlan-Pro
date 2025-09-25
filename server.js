@@ -29,16 +29,42 @@ if (relevantEnvVars.length > 0) {
     });
 } else {
     console.log('   No APS or FORGE environment variables found');
-    console.log('🔍 Checking all environment variables for debugging:');
-    // Show first few characters of all env vars to help debug
-    Object.keys(process.env).slice(0, 10).forEach(key => {
-        console.log(`   ${key}: ${process.env[key] ? 'SET' : 'NOT SET'}`);
+    console.log('🔍 Full environment variables list (first 20):');
+    // Show ALL env vars to help debug secrets issue
+    Object.keys(process.env).slice(0, 20).forEach(key => {
+        const value = process.env[key];
+        if (key.includes('SECRET') || key.includes('KEY') || key.includes('TOKEN')) {
+            console.log(`   ${key}: ${value ? `${value.substring(0, 8)}...` : 'NOT SET'}`);
+        } else {
+            console.log(`   ${key}: ${value ? 'SET' : 'NOT SET'}`);
+        }
+    });
+    
+    // Check if secrets are accessible through other means
+    console.log('🔍 Checking for Replit-specific secret patterns:');
+    const secretKeys = Object.keys(process.env).filter(key => 
+        key.toLowerCase().includes('secret') || 
+        key.toLowerCase().includes('client') ||
+        key.toLowerCase().includes('aps') ||
+        key.toLowerCase().includes('forge')
+    );
+    secretKeys.forEach(key => {
+        console.log(`   Found potential secret key: ${key}`);
     });
 }
 
-// Try multiple ways to get the credentials
-const APS_CLIENT_ID = process.env.APS_CLIENT_ID || process.env.FORGE_CLIENT_ID || process.env['APS_CLIENT_ID'] || process.env['FORGE_CLIENT_ID'];
-const APS_CLIENT_SECRET = process.env.APS_CLIENT_SECRET || process.env.FORGE_CLIENT_SECRET || process.env['APS_CLIENT_SECRET'] || process.env['FORGE_CLIENT_SECRET'];
+// Try multiple ways to get the credentials including Replit-specific paths
+const APS_CLIENT_ID = process.env.APS_CLIENT_ID || 
+                      process.env.FORGE_CLIENT_ID || 
+                      process.env['APS_CLIENT_ID'] || 
+                      process.env['FORGE_CLIENT_ID'] ||
+                      process.env.REPLIT_DB_URL && require('url').parse(process.env.REPLIT_DB_URL).auth?.split(':')[0];
+
+const APS_CLIENT_SECRET = process.env.APS_CLIENT_SECRET || 
+                          process.env.FORGE_CLIENT_SECRET || 
+                          process.env['APS_CLIENT_SECRET'] || 
+                          process.env['FORGE_CLIENT_SECRET'] ||
+                          process.env.REPLIT_DB_URL && require('url').parse(process.env.REPLIT_DB_URL).auth?.split(':')[1];
 
 console.log('🔧 Environment Check:');
 console.log('   NODE_ENV:', process.env.NODE_ENV || 'not set');
@@ -64,6 +90,28 @@ app.get('/', (req, res) => {
 });
 
 // --- API ENDPOINTS ---
+
+// Reload environment variables
+app.get('/api/reload-env', (req, res) => {
+    // Force reload of dotenv
+    require('dotenv').config({ override: true });
+    
+    // Re-check credentials
+    const newClientId = process.env.APS_CLIENT_ID || process.env.FORGE_CLIENT_ID;
+    const newClientSecret = process.env.APS_CLIENT_SECRET || process.env.FORGE_CLIENT_SECRET;
+    
+    console.log('🔄 Environment variables reloaded:');
+    console.log(`   APS_CLIENT_ID: ${newClientId ? `${newClientId.substring(0, 8)}...` : 'NOT SET'}`);
+    console.log(`   APS_CLIENT_SECRET: ${newClientSecret ? `${newClientSecret.substring(0, 8)}...` : 'NOT SET'}`);
+    
+    res.json({
+        success: true,
+        message: 'Environment variables reloaded',
+        hasCredentials: !!(newClientId && newClientSecret),
+        clientIdPresent: !!newClientId,
+        clientSecretPresent: !!newClientSecret
+    });
+});
 
 // Test APS credentials
 app.get('/api/auth/test', async (req, res) => {
