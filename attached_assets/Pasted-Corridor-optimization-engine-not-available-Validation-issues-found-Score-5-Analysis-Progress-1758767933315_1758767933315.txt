@@ -1,0 +1,86 @@
+Corridor optimization engine not available
+⚠️ Validation issues found! Score: 5%
+Analysis Progress
+7
+Rooms
+2
+Îlots
+Detected Elements
+Walls: 0
+Doors: 0
+Windows: 0
+Restricted Areas: 0
+
+(index):4850 Initializing FloorPlan Pro...
+(index):1814 Initializing CAD processors...
+(index):1824 Setting up UI event listeners...
+(index):1849 ✅ Canvas controller initialized successfully
+(index):4861 FloorPlan Pro - Production CAD Analysis Engine Loaded
+content.js:1 Uncaught TypeError: Cannot read properties of undefined (reading 'query')
+    at content.js:1:13
+/favicon.ico:1  Failed to load resource: the server responded with a status of 404 (Not Found)
+(index):3805 Translation status: inprogress (0% complete)
+(index):3805 Translation status: inprogress (0% complete)
+(index):3805 Translation status: inprogress (0% complete)
+(index):3805 Translation status: inprogress (0% complete)
+(index):3805 Translation status: success (complete)
+(index):3623 🎯 Initializing Autodesk Viewer for URN: dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Ynpja29meW52ZTJ3NHJwem55bW9vYnlhZ3VxeGt3ZWwvMTc1ODc2NzYxMDgxOS0yMDI1MDYyOF9URVNULmR3Zw==
+endpoints.js:236 getCdnRedirectUrl is deprecated and will be removed soon
+ze.getCdnRedirectUrl @ endpoints.js:236
+(index):3751 ✅ Access token obtained
+(index):3633 ✅ Autodesk Viewer SDK initialized
+Viewer3D.js:2152 [Intervention] Slow network is detected. See [https://www.chromestatus.com/feature/5636954674692096](https://www.chromestatus.com/feature/5636954674692096) for more details. Fallback font will be used while loading: [https://fonts.autodesk.com/ArtifaktElement/WOFF2/Artifakt%20Element%20Regular.woff2](https://fonts.autodesk.com/ArtifaktElement/WOFF2/Artifakt%20Element%20Regular.woff2)
+WebGLRenderer.js:29 THREE.WebGLRenderer 71
+WebGLRenderer.js:229 WebGL Renderer: ANGLE (Intel, Intel(R) UHD Graphics (0x00009B41) Direct3D11 vs_5_0 ps_5_0, D3D11)
+WebGLRenderer.js:230 WebGL Vendor: Google Inc. (Intel)
+(index):3649 ✅ Viewer started successfully
+(index):3654 ✅ Document loaded successfully
+(index):3666 🎉 Model loaded successfully!
+(index):3672 ✅ Viewer overlay system initialized
+(index):4880 🔄 Switched to Autodesk Viewer mode
+GeometryList.js:344 Total geometry size: 0.45090293884277344 MB
+GeometryList.js:345 Number of meshes: 1
+GeometryList.js:346 Num Meshes on GPU: 1
+GeometryList.js:347 Net GPU geom memory used: 472212
+(index):3696 🎨 Geometry loaded - fitting to view
+(index):3499 🎨 Applying element color coding...
+(index):4581 Uncaught (in promise) TypeError: this.viewerInstance.impl.addOverlayScene is not a function
+    at UnifiedFloorPlanController.initializeViewer ((index):4581:46)
+    at (index):3670:76
+(index):1 Autofocus processing was blocked because a document already has a focused element.
+(index):5054 Analyzing floor plan for URN: dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Ynpja29meW52ZTJ3NHJwem55bW9vYnlhZ3VxeGt3ZWwvMTc1ODc2NzYxMDgxOS0yMDI1MDYyOF9URVNULmR3Zw==
+(index):2144 Placement Statistics: Object
+(index):2526 🔍 Running comprehensive placement validation...
+(index):2552 ✅ Validation completed: PASSED (Score: 90%)
+(index):2140 🔍 Post-generation validation: Object
+api-js.mixpanel.com/track/?verbose=1&ip=1&_=1758767648029:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+(index):2353 Corridor Generation Statistics: Object
+(index):2526 🔍 Running comprehensive placement validation...
+(index):2552 ✅ Validation completed: FAILED (Score: 5%)
+(index):2349 🔍 Post-corridor validation: Object
+(index):2526 🔍 Running comprehensive placement validation...
+(index):2552 ✅ Validation completed: FAILED (Score: 5%)
+(index):4898 🔄 Switched to Manual Canvas mode
+(index):4880 🔄 Switched to Autodesk Viewer mode
+(index):4880 🔄 Switched to Autodesk Viewer mode
+(index):4898 🔄 Switched to Manual Canvas mode
+(index):3721 Selected object ID: 964
+(index):3721 Selected object ID: 1085
+api-js.mixpanel.com/track/?verbose=1&ip=1&_=1758767738901:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+api-js.mixpanel.com/track/?verbose=1&ip=1&_=1758767762607:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+(index):2144 Placement Statistics: Object
+(index):2526 🔍 Running comprehensive placement validation...
+(index):2552 ✅ Validation completed: FAILED (Score: 5%)
+(index):2140 🔍 Post-generation validation: Object
+(index):4898 🔄 Switched to Manual Canvas mode
+(index):4880 🔄 Switched to Autodesk Viewer mode
+(index):4898 🔄 Switched to Manual Canvas mode
+(index):4880 🔄 Switched to Autodesk Viewer mode
+(index):4898 🔄 Switched to Manual Canvas mode
+(index):4880 🔄 Switched to Autodesk Viewer mode
+(index):4880 🔄 Switched to Autodesk Viewer mode
+(index):4898 🔄 Switched to Manual Canvas mode
+(index):4898 🔄 Switched to Manual Canvas mode
+
+
+THIS TIME THE VIEWERS SHOWING THE SAME THING AND ILOTS ARE SHOWING PLACING AND EVERYTHING SHOWING SUCCESS BUT NO PLACEMENTS ARE APEARING ON DESIGN
