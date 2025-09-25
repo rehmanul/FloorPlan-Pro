@@ -1,0 +1,369 @@
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+FloorPlan-Pro:1 The source list for the Content Security Policy directive 'default-src' contains an invalid source: ''unsafe-dynamic''. It will be ignored.
+FloorPlan-Pro:1 The Content-Security-Policy directive 'default-src' contains 'report-uri' as a source expression. Did you want to add it as a directive and forget a semicolon?
+FloorPlan-Pro:1 The source list for Content Security Policy directive 'default-src' contains a source with an invalid path: '/api/4509669501698048/security/?sentry_key=7eb3d90eb4660416caf507087367e67e'. The query component, including the '?', will be ignored.
+ stallwart: failed ping 1
+ stallwart: failed ping 2
+ stallwart: failed ping 3
+ 
+      /////////////////////
+   ///////////////////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////        Curious and driven?
+  ///////////////@@@@@@@///////        Work with us!
+  ///////////////@@@@@@@///////
+  ///////////////@@@@@@@///////        https://join.replit.com/hack.with.us
+  ////////@@@@@@@//////////////
+  ////////@@@@@@@//////////////
+  ////////@@@@@@#//////////////
+   ///////////////////////////
+      /////////////////////
+      
+ stallwart: failed ping 1
+ [LaunchDarkly] LaunchDarkly client initialized
+content.js:1 Uncaught 
+cdn.segment.com/next-integrations/actions/tiktok-pixel/1526190d7b84ef9800b4.js:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+ Failed to create PluginFactory Object
+(anonymous) @ _app-98c344981168771c.js:34
+ Failed to load Remote Plugin 
+(anonymous) @ _app-98c344981168771c.js:34
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3Aa3a2c410&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=4fb913cf-6c82-4b2d-a966-c4a64a9ccc5a:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+ stallwart: failed ping 1
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.
+ Unrecognized feature: 'ambient-light-sensor'.
+_ @ framework-1f565c55717bb54a.js:1
+ Unrecognized feature: 'battery'.
+_ @ framework-1f565c55717bb54a.js:1
+ Unrecognized feature: 'execution-while-not-rendered'.
+_ @ framework-1f565c55717bb54a.js:1
+ Unrecognized feature: 'execution-while-out-of-viewport'.
+_ @ framework-1f565c55717bb54a.js:1
+ Unrecognized feature: 'layout-animations'.
+_ @ framework-1f565c55717bb54a.js:1
+ Unrecognized feature: 'legacy-image-formats'.
+_ @ framework-1f565c55717bb54a.js:1
+ Unrecognized feature: 'navigation-override'.
+_ @ framework-1f565c55717bb54a.js:1
+ Unrecognized feature: 'oversized-images'.
+_ @ framework-1f565c55717bb54a.js:1
+ Unrecognized feature: 'publickey-credentials'.
+_ @ framework-1f565c55717bb54a.js:1
+ Unrecognized feature: 'speaker-selection'.
+_ @ framework-1f565c55717bb54a.js:1
+ Unrecognized feature: 'unoptimized-images'.
+_ @ framework-1f565c55717bb54a.js:1
+ Unrecognized feature: 'unsized-media'.
+_ @ framework-1f565c55717bb54a.js:1
+ Unrecognized feature: 'pointer-lock'.
+_ @ framework-1f565c55717bb54a.js:1
+ Allow attribute will take precedence over 'allowfullscreen'.
+_ @ framework-1f565c55717bb54a.js:1
+ Allow attribute will take precedence over 'allowpaymentrequest'.
+_ @ framework-1f565c55717bb54a.js:1
+ stallwart: failed ping 1
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3Aa3a2c410&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=7ae75e88-7491-47c2-8e0a-6e9f3b71d43d:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3Aa3a2c410&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=24c5ac7e-510b-43e5-aea6-890a9e852407:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/diagnostic/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/diagnostic/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3Aa3a2c410&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=cdde16fa-60c4-41be-a7b6-3aa496eab4c7:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3Aa3a2c410&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=3b6786ab-f535-454e-b7da-648461b60590:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3Aa3a2c410&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=7e272957-505e-469e-b6ab-6a128930c2ad:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3Aa3a2c410&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=9302d688-fedc-47e9-b6d4-eed3dedbf742:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/diagnostic/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/diagnostic/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/diagnostic/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/diagnostic/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3Aa3a2c410&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=a431fa25-2529-4780-b397-d80e94a3c720:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+content.js:10 Uncaught 
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3Aa3a2c410&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=27113586-b6c2-4144-a006-9f1c2a30c6be:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+content.js:10 Uncaught 
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3Aa3a2c410&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=f4cc1709-d970-4227-b861-572a111a1ca4:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3Aa3a2c410&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=43ed5296-92a4-467f-a2b5-07017e0891c5:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3Aa3a2c410&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=391d22a8-4d4c-43aa-b481-a025c12f0fc6:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3Aa3a2c410&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=acc8d6a5-76ba-4656-84b1-34fb347d9348:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+ stallwart: failed ping 1
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+ stallwart: failed ping 1
+content.js:10 Uncaught 
+content.js:10 Uncaught 
+workspace_iframe.html?initialPath=%2F&id=%3Arcp%3A:32 Unrecognized feature: 'ambient-light-sensor'.
+workspace_iframe.html?initialPath=%2F&id=%3Arcp%3A:32 Unrecognized feature: 'battery'.
+workspace_iframe.html?initialPath=%2F&id=%3Arcp%3A:32 Unrecognized feature: 'execution-while-not-rendered'.
+workspace_iframe.html?initialPath=%2F&id=%3Arcp%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.
+workspace_iframe.html?initialPath=%2F&id=%3Arcp%3A:32 Unrecognized feature: 'layout-animations'.
+workspace_iframe.html?initialPath=%2F&id=%3Arcp%3A:32 Unrecognized feature: 'legacy-image-formats'.
+workspace_iframe.html?initialPath=%2F&id=%3Arcp%3A:32 Unrecognized feature: 'navigation-override'.
+workspace_iframe.html?initialPath=%2F&id=%3Arcp%3A:32 Unrecognized feature: 'oversized-images'.
+workspace_iframe.html?initialPath=%2F&id=%3Arcp%3A:32 Unrecognized feature: 'publickey-credentials'.
+workspace_iframe.html?initialPath=%2F&id=%3Arcp%3A:32 Unrecognized feature: 'speaker-selection'.
+workspace_iframe.html?initialPath=%2F&id=%3Arcp%3A:32 Unrecognized feature: 'unoptimized-images'.
+workspace_iframe.html?initialPath=%2F&id=%3Arcp%3A:32 Unrecognized feature: 'unsized-media'.
+workspace_iframe.html?initialPath=%2F&id=%3Arcp%3A:32 Allow attribute will take precedence over 'allowfullscreen'.
+workspace_iframe.html?initialPath=%2F&id=%3Arcp%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.
+Console.js:61 Initializing FloorPlan Pro...
+Console.js:61 FloorPlan Pro - Production CAD Analysis Engine Loaded
+/public/js/beacon.js:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+content.js:10 Uncaught TypeError: Cannot read properties of undefined (reading 'sendMessage')
+    at o (content.js:10:5927)
+    at content.js:10:5838
+content.js:10 Uncaught TypeError: Cannot read properties of undefined (reading 'sendMessage')
+    at o (content.js:10:5927)
+    at content.js:10:5838
+content.js:10 Uncaught TypeError: Cannot read properties of undefined (reading 'sendMessage')
+    at o (content.js:10:5927)
+    at content.js:10:5838
+Console.js:61 Translation status: pending (0% complete)
+content.js:10 Uncaught TypeError: Cannot read properties of undefined (reading 'sendMessage')
+    at o (content.js:10:5927)
+    at content.js:10:5838
+content.js:10 Uncaught TypeError: Cannot read properties of undefined (reading 'sendMessage')
+    at o (content.js:10:5927)
+    at content.js:10:5838
+Console.js:61 Translation status: inprogress (0% complete)
+content.js:10 Uncaught TypeError: Cannot read properties of undefined (reading 'sendMessage')
+    at o (content.js:10:5927)
+    at content.js:10:5838
+content.js:10 Uncaught TypeError: Cannot read properties of undefined (reading 'sendMessage')
+    at o (content.js:10:5927)
+    at content.js:10:5838
+Console.js:61 Translation status: inprogress (0% complete)
+Console.js:61 Translation status: success (complete)
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3Aa3a2c410&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=9705e4fa-c036-4518-9765-f2982663bbc1:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+Console.js:61 🎯 Initializing Autodesk Viewer for URN: dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Ynpja29meW52ZTJ3NHJwem55bW9vYnlhZ3VxeGt3ZWwvMTc1ODc2NjM5OTQ1Ni0yMDI1MDYyOF9URVNULmR3Zw==
+Console.js:61 getCdnRedirectUrl is deprecated and will be removed soon
+Mt.forEach.n.<computed> @ Console.js:61
+Console.js:61 ✅ Access token obtained
+Console.js:61 ✅ Autodesk Viewer SDK initialized
+Console.js:61 THREE.WebGLRenderer 71
+Console.js:61 WebGL Renderer: ANGLE (Intel, Intel(R) UHD Graphics (0x00009B41) Direct3D11 vs_5_0 ps_5_0, D3D11)
+Console.js:61 WebGL Vendor: Google Inc. (Intel)
+Console.js:61 ✅ Viewer started successfully
+Console.js:61 ✅ Document loaded successfully
+Console.js:61 Auto-hiding stuck status overlay
+Console.js:61 🎉 Model loaded successfully!
+Console.js:61 Total geometry size: 0.45090293884277344 MB
+Console.js:61 Number of meshes: 1
+Console.js:61 Num Meshes on GPU: 1
+Console.js:61 Net GPU geom memory used: 472212
+Console.js:61 🎨 Geometry loaded - fitting to view
+Console.js:61 🎨 Applying element color coding...
+CalibrationPanels.js:130 Blocked autofocusing on a <input> element in a cross-origin subframe.
+Mt @ CalibrationPanels.js:130
+api-js.mixpanel.com/track/?verbose=1&ip=1&_=1758766431913:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+events.launchdarkly.com/events/bulk/62b35a865152ab14c5942820:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+Console.js:61 Placement Statistics: Object
+Console.js:61 🏗️ Visualizing îlots on 3D model...
+Console.js:61 🔍 Running comprehensive placement validation...
+Console.js:61 ✅ Validation completed: PASSED (Score: 90%)
+Console.js:61 🔍 Post-generation validation: Object
+Console.js:61 🏗️ Visualizing îlots on 3D model...
+content.js:10 Uncaught TypeError: Cannot read properties of undefined (reading 'sendMessage')
+    at o (content.js:10:5927)
+    at content.js:10:5838
+content.js:10 Uncaught TypeError: Cannot read properties of undefined (reading 'sendMessage')
+    at o (content.js:10:5927)
+    at content.js:10:5838
+Console.js:61 Corridor Generation Statistics: Object
+Console.js:61 🔍 Running comprehensive placement validation...
+Console.js:61 ✅ Validation completed: FAILED (Score: 5%)
+Console.js:61 🔍 Post-corridor validation: Object
+(index):2696 Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'optimizeCorridorNetwork')
+    at HTMLButtonElement.optimizePaths ((index):2696:31)
+Console.js:61 🔍 Running comprehensive placement validation...
+Console.js:61 ✅ Validation completed: FAILED (Score: 5%)
+Console.js:61 Canvas clicked at: 579 251.203125
+Console.js:61 Canvas clicked at: 368 312.203125
+Console.js:61 Canvas clicked at: 368 312.203125
+Console.js:61 Canvas clicked at: 368 312.203125
+Console.js:61 Canvas clicked at: 368 312.203125
+Console.js:61 Canvas clicked at: 368 312.203125
+Console.js:61 Canvas clicked at: 368 311.203125
+Console.js:61 Canvas clicked at: 368 311.203125
+Console.js:61 Canvas clicked at: 371 308.203125
+Console.js:61 Canvas clicked at: 372 307.203125
+Console.js:61 Canvas clicked at: 372 307.203125
+Console.js:61 Canvas clicked at: 372 307.203125
+Console.js:61 Canvas clicked at: 372 307.203125
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Abeacon%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3Aa3a2c410&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=828531e0-2baf-4a64-9aa5-1356a4c23929:1  Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
+Console.js:61 Canvas clicked at: 603 101.203125
+content.js:10 Uncaught TypeError: Cannot read properties of undefined (reading 'sendMessage')
+    at o (content.js:10:5927)
+    at content.js:10:5838
+FloorPlan-Pro:1  Failed to load resource: the server responded with a status of 403 ()
