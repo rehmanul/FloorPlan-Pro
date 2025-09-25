@@ -1,0 +1,185 @@
+
+> floorplan-pro@1.0.0 dev
+> nodemon server.js
+
+[nodemon] 3.1.10
+[nodemon] to restart at any time, enter `rs`
+[nodemon] watching path(s): *.*
+[nodemon] watching extensions: js,mjs,cjs,json
+[nodemon] starting `node server.js`
+[dotenv@17.2.1] injecting env (0) from .env -- tip: ⚙️  enable debug logging with { debug: true }
+🔍 Debug - All environment variables starting with APS or FORGE:
+   No APS or FORGE environment variables found
+🔍 Checking all environment variables for debugging:
+   PGPORT: SET
+   REPL_SLUG: SET
+   DATABASE_URL: SET
+   REPL_IMAGE: SET
+   USER: SET
+   npm_config_user_agent: SET
+   REPL_OWNER: SET
+   REPLIT_DB_URL: SET
+   GIT_EDITOR: SET
+   HOSTNAME: SET
+🔧 Environment Check:
+   NODE_ENV: not set
+   APS_CLIENT_ID: NOT SET
+   APS_CLIENT_SECRET: NOT SET
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!! WARNING: Missing APS_CLIENT_ID or APS_CLIENT_SECRET environment variables.
+!!! CAD file processing features will be disabled until credentials are provided.
+!!! Please add your Autodesk Platform Services credentials using the secrets manager.
+!!! Make sure your APS app has access to: Data Management API, Model Derivative API
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+FloorPlan Pro Backend running on http://0.0.0.0:5000
+🔗 WebSocket server ready for real-time collaboration
+🚀 Starting upload: ovoDOSSIER COSTO - plan entresol- projet-.dxf
+   Step 1: Getting authentication token...
+❌ UPLOAD FAILED:
+   HTTP Status: 403
+   Response data: {
+  "developerMessage": "The client_id specified does not have access to the api product",
+  "moreInfo": "https://aps.autodesk.com/en/docs/oauth/v2/developers_guide/error_handling/",
+  "errorCode": "AUTH-001"
+}
+[nodemon] restarting child process
+[nodemon] starting `node server.js`
+[dotenv@17.2.1] injecting env (0) from .env -- tip: ⚙️  enable debug logging with { debug: true }
+🔍 Debug - All environment variables starting with APS or FORGE:
+   No APS or FORGE environment variables found
+🔍 Checking all environment variables for debugging:
+   PGPORT: SET
+   REPL_SLUG: SET
+   DATABASE_URL: SET
+   REPL_IMAGE: SET
+   USER: SET
+   npm_config_user_agent: SET
+   REPL_OWNER: SET
+   REPLIT_DB_URL: SET
+   GIT_EDITOR: SET
+   HOSTNAME: SET
+🔧 Environment Check:
+   NODE_ENV: not set
+   APS_CLIENT_ID: NOT SET
+   APS_CLIENT_SECRET: NOT SET
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!! WARNING: Missing APS_CLIENT_ID or APS_CLIENT_SECRET environment variables.
+!!! CAD file processing features will be disabled until credentials are provided.
+!!! Please add your Autodesk Platform Services credentials using the secrets manager.
+!!! Make sure your APS app has access to: Data Management API, Model Derivative API
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+FloorPlan Pro Backend running on http://0.0.0.0:5000
+🔗 WebSocket server ready for real-time collaboration
+^C🚀 Starting upload: 20250628_TEST.dwg
+   Step 1: Getting authentication token...
+❌ UPLOAD FAILED:
+   HTTP Status: 403
+   Response data: {
+  "developerMessage": "The client_id specified does not have access to the api product",
+  "moreInfo": "https://aps.autodesk.com/en/docs/oauth/v2/developers_guide/error_handling/",
+  "errorCode": "AUTH-001"
+}
+^C^C^C🏗️ Starting advanced îlot placement with options: { coverage: 0.25 }
+📐 FloorPlan data: [ 'bounds', 'rooms' ]
+[ProductionGeometryEngine] Production GeometryEngine initialized {
+  tolerance: 0.001,
+  scaleFactor: 10000,
+  hasClipper: true,
+  hasMartinez: true,
+  hasRBush: true
+}
+[IlotPlacementEngine] IlotPlacementEngine initialized {
+  minWallDistance: 0.5,
+  minIlotDistance: 2,
+  minDoorClearance: 1.5,
+  maxWallDistance: 5,
+  defaultIlotSize: { width: 3, height: 2 },
+  minIlotSize: { width: 2, height: 1.5 },
+  maxIlotSize: { width: 4, height: 3 },
+  maxIterations: 1000,
+  placementStrategy: 'optimized',
+  gridResolution: 0.5,
+  coverage: 0.25,
+  maxIlots: 50,
+  weights: { spaceUtilization: 0.4, accessibility: 0.3, workflow: 0.3 },
+  maxPlacementAttempts: 1000,
+  timeoutMs: 30000,
+  debugMode: true,
+  strictValidation: false
+}
+🏗️ Attempting advanced placement...
+[IlotPlacementEngine] Starting optimized îlot placement {}
+[IlotPlacementEngine] Preparing floor plan for placement {}
+[IlotPlacementEngine] Calculating allowed placement zones {}
+[IlotPlacementEngine] Allowed zones calculated { totalAllowedZones: 1, restrictedZonesProcessed: 0 }
+[IlotPlacementEngine] Floor plan preparation completed { restrictedZones: 0, allowedZones: 1 }
+[IlotPlacementEngine] Creating placement grid { gridWidth: 40, gridHeight: 30, resolution: 0.5 }
+[IlotPlacementEngine] Placement grid created { totalCells: 1200, validCells: 1200 }
+[IlotPlacementEngine] Executing placement strategy { strategy: 'optimized', targetIlots: undefined }
+[IlotPlacementEngine] Executing optimized placement strategy - FIXED VERSION {}
+[IlotPlacementEngine] Got sorted cells { count: 1200 }
+[IlotPlacementEngine] Starting optimized placement { targetIlots: undefined, availableCells: 1200 }
+[IlotPlacementEngine] Optimized placement completed { placed: 0, target: undefined, successRate: NaN }
+[IlotPlacementEngine] Starting placement optimization {}
+[IlotPlacementEngine] Placement optimization completed { iterations: 1 }
+[IlotPlacementEngine] Optimized placement completed { placedIlots: 0, totalAttempts: 0, successRate: 0 }
+✅ Advanced placement succeeded: 0 îlots
+✅ Advanced placement completed: 0 îlots placed
+🏗️ Starting advanced îlot placement with options: {}
+📐 FloorPlan data: missing
+⚠️ Using default floor plan structure
+[ProductionGeometryEngine] Production GeometryEngine initialized {
+  tolerance: 0.001,
+  scaleFactor: 10000,
+  hasClipper: true,
+  hasMartinez: true,
+  hasRBush: true
+}
+[IlotPlacementEngine] IlotPlacementEngine initialized {
+  minWallDistance: 0.5,
+  minIlotDistance: 2,
+  minDoorClearance: 1.5,
+  maxWallDistance: 5,
+  defaultIlotSize: { width: 3, height: 2 },
+  minIlotSize: { width: 2, height: 1.5 },
+  maxIlotSize: { width: 4, height: 3 },
+  maxIterations: 1000,
+  placementStrategy: 'optimized',
+  gridResolution: 0.5,
+  coverage: 0.3,
+  maxIlots: 50,
+  weights: { spaceUtilization: 0.4, accessibility: 0.3, workflow: 0.3 },
+  maxPlacementAttempts: 1000,
+  timeoutMs: 30000,
+  debugMode: true,
+  strictValidation: false
+}
+🏗️ Attempting advanced placement...
+[IlotPlacementEngine] Starting optimized îlot placement {}
+[IlotPlacementEngine] Preparing floor plan for placement {}
+[IlotPlacementEngine] Calculating allowed placement zones {}
+[IlotPlacementEngine] Allowed zones calculated { totalAllowedZones: 1, restrictedZonesProcessed: 0 }
+[IlotPlacementEngine] Floor plan preparation completed { restrictedZones: 0, allowedZones: 1 }
+[IlotPlacementEngine] Creating placement grid { gridWidth: 40, gridHeight: 30, resolution: 0.5 }
+[IlotPlacementEngine] Placement grid created { totalCells: 1200, validCells: 1200 }
+[IlotPlacementEngine] Executing placement strategy { strategy: 'optimized', targetIlots: undefined }
+[IlotPlacementEngine] Executing optimized placement strategy - FIXED VERSION {}
+[IlotPlacementEngine] Got sorted cells { count: 1200 }
+[IlotPlacementEngine] Starting optimized placement { targetIlots: undefined, availableCells: 1200 }
+[IlotPlacementEngine] Optimized placement completed { placed: 0, target: undefined, successRate: NaN }
+[IlotPlacementEngine] Starting placement optimization {}
+[IlotPlacementEngine] Placement optimization completed { iterations: 1 }
+[IlotPlacementEngine] Optimized placement completed { placedIlots: 0, totalAttempts: 0, successRate: 0 }
+✅ Advanced placement succeeded: 0 îlots
+✅ Advanced placement completed: 0 îlots placed
+🚀 Starting upload: 20250628_TEST.dwg
+   Step 1: Getting authentication token...
+❌ UPLOAD FAILED:
+   HTTP Status: 403
+   Response data: {
+  "developerMessage": "The client_id specified does not have access to the api product",
+  "moreInfo": "https://aps.autodesk.com/en/docs/oauth/v2/developers_guide/error_handling/",
+  "errorCode": "AUTH-001"
+}

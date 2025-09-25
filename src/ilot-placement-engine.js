@@ -972,6 +972,174 @@ class IlotPlacementEngine {
      */
 
     /**
+     * Calculate îlot requirements based on floor plan and configuration
+     * This is the missing method that was causing targetIlots: undefined
+     */
+    calculateIlotRequirements(placementConfig) {
+        try {
+            this.log('Calculating îlot requirements');
+
+            // Get usable area and coverage from config
+            const usableArea = this.calculateUsableArea();
+            const coverage = this.getSafeNumber(placementConfig.coverage, 0.3);
+            const maxIlots = this.getSafeNumber(placementConfig.maxIlots, 50);
+
+            // Calculate îlot dimensions to determine footprint
+            const defaultIlotSize = placementConfig.defaultIlotSize || this.config.defaultIlotSize;
+            const avgIlotWidth = this.getSafeNumber(defaultIlotSize.width, 3.0);
+            const avgIlotHeight = this.getSafeNumber(defaultIlotSize.height, 2.0);
+            const avgIlotArea = avgIlotWidth * avgIlotHeight;
+
+            // Add clearance area per îlot
+            const minDistance = this.getSafeNumber(placementConfig.minIlotDistance, 2.0);
+            const clearanceArea = (avgIlotWidth + minDistance) * (avgIlotHeight + minDistance) - avgIlotArea;
+            const totalAreaPerIlot = avgIlotArea + clearanceArea;
+
+            // Calculate target îlots based on coverage
+            const targetAreaForIlots = usableArea * coverage;
+            const calculatedTarget = Math.floor(targetAreaForIlots / totalAreaPerIlot);
+            const targetIlots = Math.max(1, Math.min(calculatedTarget, maxIlots));
+
+            // Determine îlot types
+            const ilotTypes = this.determineIlotTypes(placementConfig);
+
+            const requirements = {
+                totalIlots: targetIlots,
+                ilotTypes: ilotTypes,
+                usableArea: usableArea,
+                coverage: coverage,
+                avgIlotArea: avgIlotArea,
+                calculationMethod: 'coverage_based'
+            };
+
+            this.log('Îlot requirements calculated', {
+                usableArea: usableArea.toFixed(2),
+                coverage: coverage,
+                targetIlots: targetIlots,
+                avgIlotArea: avgIlotArea,
+                totalAreaPerIlot: totalAreaPerIlot.toFixed(2)
+            });
+
+            return requirements;
+
+        } catch (error) {
+            this.logError('Failed to calculate îlot requirements', error);
+            // Return safe defaults
+            return {
+                totalIlots: 5,
+                ilotTypes: ['workspace'],
+                usableArea: 100,
+                coverage: 0.25,
+                avgIlotArea: 6,
+                calculationMethod: 'fallback'
+            };
+        }
+    }
+
+    /**
+     * Execute the selected placement strategy
+     * This is the missing method that handles different placement strategies
+     */
+    async executePlacementStrategy(ilotRequirements, placementConfig) {
+        try {
+            const strategy = placementConfig.placementStrategy || 'optimized';
+            const targetIlots = ilotRequirements?.totalIlots || 5;
+
+            this.log('Executing placement strategy', { 
+                strategy: strategy, 
+                targetIlots: targetIlots 
+            });
+
+            // Execute strategy based on type
+            switch (strategy) {
+                case 'optimized':
+                    await this.executeOptimizedPlacement(ilotRequirements, placementConfig);
+                    break;
+                case 'grid':
+                    await this.executeGridPlacement(ilotRequirements, placementConfig);
+                    break;
+                case 'random':
+                    await this.executeRandomPlacement(ilotRequirements, placementConfig);
+                    break;
+                default:
+                    this.log('Unknown strategy, falling back to optimized', { strategy });
+                    await this.executeOptimizedPlacement(ilotRequirements, placementConfig);
+            }
+
+        } catch (error) {
+            this.logError('Placement strategy execution failed', error);
+            // Fallback to simple grid placement
+            try {
+                await this.executeGridPlacement(ilotRequirements || { totalIlots: 5, ilotTypes: ['workspace'] }, placementConfig);
+            } catch (fallbackError) {
+                this.logError('Fallback placement strategy also failed', fallbackError);
+            }
+        }
+    }
+
+    /**
+     * Execute optimized placement strategy - FIXED VERSION
+     * This method was missing proper implementation
+     */
+    async executeOptimizedPlacement(ilotRequirements, placementConfig) {
+        try {
+            this.log('Executing optimized placement strategy - FIXED VERSION');
+
+            const targetIlots = ilotRequirements?.totalIlots || 5;
+            const ilotTypes = ilotRequirements?.ilotTypes || ['workspace'];
+
+            // Get sorted placement cells
+            const sortedCells = this.getSortedPlacementCells();
+            this.log('Got sorted cells', { count: sortedCells.length });
+
+            this.log('Starting optimized placement', { 
+                targetIlots: targetIlots, 
+                availableCells: sortedCells.length 
+            });
+
+            let placedCount = 0;
+            let attempts = 0;
+            const maxAttempts = Math.max(targetIlots * 10, 100);
+
+            // Place îlots using best cells first
+            for (const cell of sortedCells) {
+                if (placedCount >= targetIlots) break;
+                if (attempts >= maxAttempts) break;
+
+                try {
+                    const worldPos = this.gridToWorld(cell.x, cell.y);
+                    const ilotType = ilotTypes[placedCount % ilotTypes.length];
+
+                    const placement = await this.attemptIlotPlacement(worldPos, ilotType, placementConfig);
+
+                    if (placement) {
+                        this.placedIlots.push(placement);
+                        this.indexPlacedIlot(placement);
+                        placedCount++;
+                        this.placementStats.successfulPlacements++;
+                    }
+
+                    attempts++;
+                    this.placementStats.totalAttempts++;
+
+                } catch (cellError) {
+                    this.log('Warning: Cell placement failed', { cell, error: cellError.message });
+                    attempts++;
+                }
+            }
+
+            this.log('Optimized placement completed', { 
+                placed: placedCount, 
+                target: targetIlots, 
+                successRate: attempts > 0 ? (placedCount / attempts) : 0 
+            });
+
+        } catch (error) {
+            this.logError('Optimized placement strategy failed', error);
+        }
+    }
+
+    /**
      * FIXED: Attempt to place an îlot at a specific position
      * This is the main method that was causing the clearance error
      */
