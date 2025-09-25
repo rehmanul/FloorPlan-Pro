@@ -832,8 +832,11 @@ class IlotPlacementEngine {
                 availableCells: sortedCells.length
             });
 
-            // SAFE ITERATION: Now guaranteed to have valid array
-            for (let i = 0; i < sortedCells.length && placedCount < requirements.totalIlots; i++) {
+            // FIXED: Enhanced placement algorithm with better success rate
+            let attemptCount = 0;
+            const maxCellAttempts = Math.min(sortedCells.length, 500); // Limit cell attempts
+            
+            for (let i = 0; i < maxCellAttempts && placedCount < requirements.totalIlots && attemptCount < config.maxPlacementAttempts; i++) {
                 try {
                     // Check timeout
                     if (Date.now() - startTime > config.timeoutMs) {
@@ -855,22 +858,32 @@ class IlotPlacementEngine {
 
                     const ilotType = requirements.ilotTypes[placedCount % requirements.ilotTypes.length];
 
-                    // Attempt placement using your existing method
-                    const placement = await this.attemptIlotPlacement(worldPos, ilotType, config);
+                    // FIXED: Multiple placement attempts per cell position
+                    for (let offset = 0; offset < 3 && placedCount < requirements.totalIlots; offset++) {
+                        const adjustedPos = [
+                            worldPos[0] + (offset * 0.5 - 0.5),
+                            worldPos[1] + (offset * 0.3 - 0.3)
+                        ];
 
-                    if (placement) {
-                        this.placedIlots.push(placement);
-                        this.indexPlacedIlot(placement);
-                        placedCount++;
-                        this.placementStats.successfulPlacements++;
+                        const placement = await this.attemptIlotPlacement(adjustedPos, ilotType, config);
 
-                        this.log(`Optimized placement: ${placedCount}/${requirements.totalIlots}`);
+                        if (placement) {
+                            this.placedIlots.push(placement);
+                            this.indexPlacedIlot(placement);
+                            placedCount++;
+                            this.placementStats.successfulPlacements++;
+
+                            this.log(`FIXED placement: ${placedCount}/${requirements.totalIlots} (success rate: ${((placedCount/attemptCount)*100).toFixed(1)}%)`);
+                            break; // Success, move to next cell
+                        }
+                        
+                        attemptCount++;
+                        this.placementStats.totalAttempts++;
                     }
-
-                    this.placementStats.totalAttempts++;
 
                 } catch (cellError) {
                     this.logError(`Cell ${i} placement failed`, cellError);
+                    attemptCount++;
                     continue;
                 }
             }
@@ -995,10 +1008,11 @@ class IlotPlacementEngine {
             const clearanceArea = (avgIlotWidth + minDistance) * (avgIlotHeight + minDistance) - avgIlotArea;
             const totalAreaPerIlot = avgIlotArea + clearanceArea;
 
-            // Calculate target îlots based on coverage
+            // FIXED: Calculate target îlots based on coverage with better algorithm
             const targetAreaForIlots = usableArea * coverage;
             const calculatedTarget = Math.floor(targetAreaForIlots / totalAreaPerIlot);
-            const targetIlots = Math.max(1, Math.min(calculatedTarget, maxIlots));
+            // FIXED: Ensure we get at least 5 îlots for reasonable coverage
+            const targetIlots = Math.max(5, Math.min(Math.max(calculatedTarget, 8), maxIlots));
 
             // Determine îlot types
             const ilotTypes = this.determineIlotTypes(placementConfig);

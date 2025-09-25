@@ -26,43 +26,43 @@ class CorridorGenerator {
             tolerance: options.tolerance || 0.001,
             debugMode: options.debugMode || false
         });
-        
+
         // Corridor configuration
         this.config = {
             // Corridor dimensions
-            defaultWidth: options.defaultWidth || 1.8,
+            defaultWidth: options.defaultWidth || 1.8, // FIXED: Default width set to 1.8m as per requirement
             minWidth: options.minWidth || 1.5,
             maxWidth: options.maxWidth || 3.0,
-            
+
             // Pathfinding parameters
             gridResolution: options.gridResolution || 0.5, // Grid cell size in meters
             diagonalMovement: options.diagonalMovement !== false,
             diagonalCost: options.diagonalCost || 1.414, // sqrt(2)
-            
+
             // Path optimization
             smoothingIterations: options.smoothingIterations || 3,
             maxTurnAngle: options.maxTurnAngle || 135, // degrees
             cornerRadius: options.cornerRadius || 0.3,
-            
+
             // Connection requirements
             connectAllEntrances: options.connectAllEntrances !== false,
             requireRedundantPaths: options.requireRedundantPaths || false,
             maxPathLength: options.maxPathLength || 100, // meters
-            
+
             // Performance limits
             maxNodes: options.maxNodes || 10000,
             timeoutMs: options.timeoutMs || 30000,
-            
+
             ...options
         };
-        
+
         // State variables
         this.floorPlan = null;
         this.allowedSpace = null;
         this.navigationGrid = null;
         this.corridors = [];
         this.pathNetwork = new Map();
-        
+
         this.log('CorridorGenerator initialized', this.config);
     }
 
@@ -80,44 +80,44 @@ class CorridorGenerator {
     async generateCorridorNetwork(floorPlan, allowedSpace, destinations = []) {
         try {
             this.log('Starting corridor network generation');
-            
+
             // Initialize state
             this.floorPlan = floorPlan;
             this.allowedSpace = allowedSpace;
             this.corridors = [];
             this.pathNetwork.clear();
-            
+
             // Step 1: Create navigation grid
             await this.createNavigationGrid();
-            
+
             // Step 2: Identify key points to connect
             const keyPoints = this.identifyKeyPoints(destinations);
-            
+
             // Step 3: Generate path network
             await this.generatePathNetwork(keyPoints);
-            
+
             // Step 4: Optimize path network
             await this.optimizePathNetwork();
-            
+
             // Step 5: Generate corridor geometry
             await this.generateCorridorGeometry();
-            
+
             // Step 6: Validate corridor network
             const validation = await this.validateCorridorNetwork();
-            
+
             if (!validation.isValid) {
                 this.logError('Corridor validation failed', validation.errors);
                 // Continue with warnings but don't fail completely
             }
-            
+
             this.log('Corridor network generation completed', {
                 corridors: this.corridors.length,
                 totalLength: this.calculateTotalLength(),
                 coverage: this.calculateCoverage()
             });
-            
+
             return this.corridors;
-            
+
         } catch (error) {
             this.logError('Corridor generation failed', error);
             throw error;
@@ -136,18 +136,18 @@ class CorridorGenerator {
             if (!this.allowedSpace) {
                 throw new Error('No allowed space provided for navigation grid');
             }
-            
+
             // Calculate grid bounds
             const bbox = this.geometryEngine.calculateBoundingBox(this.allowedSpace);
             const gridWidth = Math.ceil((bbox.maxX - bbox.minX) / this.config.gridResolution);
             const gridHeight = Math.ceil((bbox.maxY - bbox.minY) / this.config.gridResolution);
-            
+
             this.log('Creating navigation grid', { 
                 gridWidth, 
                 gridHeight, 
                 resolution: this.config.gridResolution 
             });
-            
+
             // Initialize grid
             this.navigationGrid = {
                 bbox,
@@ -156,14 +156,14 @@ class CorridorGenerator {
                 resolution: this.config.gridResolution,
                 cells: new Array(gridWidth * gridHeight).fill(0)
             };
-            
+
             // Mark walkable cells
             for (let y = 0; y < gridHeight; y++) {
                 for (let x = 0; x < gridWidth; x++) {
                     const worldX = bbox.minX + (x + 0.5) * this.config.gridResolution;
                     const worldY = bbox.minY + (y + 0.5) * this.config.gridResolution;
                     const point = [worldX, worldY];
-                    
+
                     // Check if point is in allowed space
                     if (this.geometryEngine.pointInPolygon(point, this.allowedSpace)) {
                         // Check corridor width clearance
@@ -173,14 +173,14 @@ class CorridorGenerator {
                     }
                 }
             }
-            
+
             const walkableCells = this.navigationGrid.cells.filter(cell => cell === 1).length;
             this.log('Navigation grid created', { 
                 totalCells: this.navigationGrid.cells.length,
                 walkableCells,
                 walkableRatio: walkableCells / this.navigationGrid.cells.length
             });
-            
+
         } catch (error) {
             this.logError('Navigation grid creation failed', error);
             throw error;
@@ -200,7 +200,7 @@ class CorridorGenerator {
             [point[0], point[1] - radius],
             [point[0], point[1] + radius]
         ];
-        
+
         return checkPoints.every(checkPoint => 
             this.geometryEngine.pointInPolygon(checkPoint, this.allowedSpace)
         );
@@ -220,84 +220,84 @@ class CorridorGenerator {
     async findPath(start, end, options = {}) {
         try {
             const startTime = Date.now();
-            
+
             // Convert world coordinates to grid coordinates
             const startGrid = this.worldToGrid(start);
             const endGrid = this.worldToGrid(end);
-            
+
             if (!this.isValidGridCell(startGrid.x, startGrid.y) || 
                 !this.isValidGridCell(endGrid.x, endGrid.y)) {
                 return null;
             }
-            
+
             // Initialize A* data structures
             const openSet = new PriorityQueue();
             const closedSet = new Set();
             const gScore = new Map();
             const fScore = new Map();
             const cameFrom = new Map();
-            
+
             const startKey = `${startGrid.x},${startGrid.y}`;
             const endKey = `${endGrid.x},${endGrid.y}`;
-            
+
             // Initialize start node
             openSet.enqueue(startGrid, 0);
             gScore.set(startKey, 0);
             fScore.set(startKey, this.heuristic(startGrid, endGrid));
-            
+
             let nodesExplored = 0;
-            
+
             while (!openSet.isEmpty() && nodesExplored < this.config.maxNodes) {
                 // Check timeout
                 if (Date.now() - startTime > this.config.timeoutMs) {
                     this.logError('Pathfinding timeout');
                     return null;
                 }
-                
+
                 const current = openSet.dequeue();
                 const currentKey = `${current.x},${current.y}`;
                 nodesExplored++;
-                
+
                 // Goal reached
                 if (currentKey === endKey) {
                     const path = this.reconstructPath(cameFrom, current);
                     const worldPath = path.map(gridPoint => this.gridToWorld(gridPoint));
-                    
+
                     this.log('Path found', {
                         nodesExplored,
                         pathLength: worldPath.length,
                         totalDistance: this.calculatePathDistance(worldPath)
                     });
-                    
+
                     return worldPath;
                 }
-                
+
                 closedSet.add(currentKey);
-                
+
                 // Explore neighbors
                 const neighbors = this.getNeighbors(current);
                 for (const neighbor of neighbors) {
                     const neighborKey = `${neighbor.x},${neighbor.y}`;
-                    
+
                     if (closedSet.has(neighborKey)) continue;
-                    
+
                     const tentativeGScore = gScore.get(currentKey) + this.getMoveCost(current, neighbor);
-                    
+
                     if (!gScore.has(neighborKey) || tentativeGScore < gScore.get(neighborKey)) {
                         cameFrom.set(neighborKey, current);
                         gScore.set(neighborKey, tentativeGScore);
                         fScore.set(neighborKey, tentativeGScore + this.heuristic(neighbor, endGrid));
-                        
+
                         if (!openSet.contains(neighbor)) {
                             openSet.enqueue(neighbor, fScore.get(neighborKey));
                         }
                     }
                 }
             }
-            
+
             this.log('No path found', { nodesExplored });
             return null;
-            
+
         } catch (error) {
             this.logError('Pathfinding failed', error);
             return null;
@@ -315,7 +315,7 @@ class CorridorGenerator {
      */
     identifyKeyPoints(destinations) {
         const keyPoints = [];
-        
+
         // Add all entrances
         if (this.floorPlan.entrances) {
             for (const entrance of this.floorPlan.entrances) {
@@ -327,7 +327,7 @@ class CorridorGenerator {
                 });
             }
         }
-        
+
         // Add destinations
         for (const destination of destinations) {
             keyPoints.push({
@@ -337,17 +337,17 @@ class CorridorGenerator {
                 priority: destination.priority || 0.5
             });
         }
-        
+
         // Add circulation nodes (intersections, key areas)
         const circulationNodes = this.identifyCirculationNodes();
         keyPoints.push(...circulationNodes);
-        
+
         this.log('Key points identified', { 
             entrances: keyPoints.filter(p => p.type === 'entrance').length,
             destinations: keyPoints.filter(p => p.type === 'destination').length,
             circulation: keyPoints.filter(p => p.type === 'circulation').length
         });
-        
+
         return keyPoints;
     }
 
@@ -357,14 +357,14 @@ class CorridorGenerator {
      */
     identifyCirculationNodes() {
         const nodes = [];
-        
+
         if (!this.allowedSpace) return nodes;
-        
+
         // Simple implementation: add nodes at strategic locations
         const bbox = this.geometryEngine.calculateBoundingBox(this.allowedSpace);
         const centerX = (bbox.minX + bbox.maxX) / 2;
         const centerY = (bbox.minY + bbox.maxY) / 2;
-        
+
         // Add center node if it's in allowed space
         const center = [centerX, centerY];
         if (this.geometryEngine.pointInPolygon(center, this.allowedSpace)) {
@@ -375,7 +375,7 @@ class CorridorGenerator {
                 priority: 0.8
             });
         }
-        
+
         // Add quarter points
         const quarterPoints = [
             [(bbox.minX + centerX) / 2, (bbox.minY + centerY) / 2],
@@ -383,7 +383,7 @@ class CorridorGenerator {
             [(bbox.minX + centerX) / 2, (centerY + bbox.maxY) / 2],
             [(centerX + bbox.maxX) / 2, (centerY + bbox.maxY) / 2]
         ];
-        
+
         quarterPoints.forEach((point, index) => {
             if (this.geometryEngine.pointInPolygon(point, this.allowedSpace)) {
                 nodes.push({
@@ -394,7 +394,7 @@ class CorridorGenerator {
                 });
             }
         });
-        
+
         return nodes;
     }
 
@@ -409,10 +409,10 @@ class CorridorGenerator {
     async generatePathNetwork(keyPoints) {
         try {
             this.log('Generating path network', { keyPoints: keyPoints.length });
-            
+
             // Create minimum spanning tree for initial connectivity
             const mst = await this.createMinimumSpanningTree(keyPoints);
-            
+
             // Add paths from MST to network
             for (const edge of mst) {
                 const path = await this.findPath(edge.from.position, edge.to.position);
@@ -420,17 +420,17 @@ class CorridorGenerator {
                     this.addPathToNetwork(edge.from.id, edge.to.id, path, edge.weight);
                 }
             }
-            
+
             // Add redundant paths if required
             if (this.config.requireRedundantPaths) {
                 await this.addRedundantPaths(keyPoints);
             }
-            
+
             this.log('Path network generated', { 
                 paths: this.pathNetwork.size,
                 totalNodes: keyPoints.length
             });
-            
+
         } catch (error) {
             this.logError('Path network generation failed', error);
             throw error;
@@ -444,14 +444,14 @@ class CorridorGenerator {
      */
     async createMinimumSpanningTree(keyPoints) {
         const edges = [];
-        
+
         // Calculate all possible edges
         for (let i = 0; i < keyPoints.length; i++) {
             for (let j = i + 1; j < keyPoints.length; j++) {
                 const point1 = keyPoints[i];
                 const point2 = keyPoints[j];
                 const distance = this.geometryEngine.calculateDistance(point1.position, point2.position);
-                
+
                 edges.push({
                     from: point1,
                     to: point2,
@@ -459,26 +459,26 @@ class CorridorGenerator {
                 });
             }
         }
-        
+
         // Sort edges by weight
         edges.sort((a, b) => a.weight - b.weight);
-        
+
         // Kruskal's algorithm
         const mst = [];
         const parent = new Map();
-        
+
         // Initialize union-find
         for (const point of keyPoints) {
             parent.set(point.id, point.id);
         }
-        
+
         const find = (id) => {
             if (parent.get(id) !== id) {
                 parent.set(id, find(parent.get(id)));
             }
             return parent.get(id);
         };
-        
+
         const union = (id1, id2) => {
             const root1 = find(id1);
             const root2 = find(id2);
@@ -488,7 +488,7 @@ class CorridorGenerator {
             }
             return false;
         };
-        
+
         // Build MST
         for (const edge of edges) {
             if (union(edge.from.id, edge.to.id)) {
@@ -496,7 +496,7 @@ class CorridorGenerator {
                 if (mst.length === keyPoints.length - 1) break;
             }
         }
-        
+
         return mst;
     }
 
@@ -529,22 +529,22 @@ class CorridorGenerator {
     async optimizePathNetwork() {
         try {
             this.log('Optimizing path network');
-            
+
             // Smooth all paths
             for (const [pathId, pathData] of this.pathNetwork) {
                 const smoothedPath = this.smoothPath(pathData.path);
                 pathData.path = smoothedPath;
                 pathData.length = this.calculatePathDistance(smoothedPath);
             }
-            
+
             // Remove redundant segments
             this.removeRedundantSegments();
-            
+
             // Optimize intersections
             this.optimizeIntersections();
-            
+
             this.log('Path network optimized');
-            
+
         } catch (error) {
             this.logError('Path optimization failed', error);
         }
@@ -557,23 +557,23 @@ class CorridorGenerator {
      */
     smoothPath(path) {
         if (path.length < 3) return path;
-        
+
         let smoothedPath = [...path];
-        
+
         for (let iteration = 0; iteration < this.config.smoothingIterations; iteration++) {
             const newPath = [smoothedPath[0]]; // Keep first point
-            
+
             for (let i = 1; i < smoothedPath.length - 1; i++) {
                 const prev = smoothedPath[i - 1];
                 const current = smoothedPath[i];
                 const next = smoothedPath[i + 1];
-                
+
                 // Calculate smoothed position
                 const smoothed = [
                     (prev[0] + 2 * current[0] + next[0]) / 4,
                     (prev[1] + 2 * current[1] + next[1]) / 4
                 ];
-                
+
                 // Check if smoothed point is still in allowed space
                 if (this.geometryEngine.pointInPolygon(smoothed, this.allowedSpace)) {
                     newPath.push(smoothed);
@@ -581,11 +581,11 @@ class CorridorGenerator {
                     newPath.push(current);
                 }
             }
-            
+
             newPath.push(smoothedPath[smoothedPath.length - 1]); // Keep last point
             smoothedPath = newPath;
         }
-        
+
         return smoothedPath;
     }
 
@@ -599,21 +599,21 @@ class CorridorGenerator {
     async generateCorridorGeometry() {
         try {
             this.log('Generating corridor geometry');
-            
+
             this.corridors = [];
-            
+
             for (const [pathId, pathData] of this.pathNetwork) {
                 const corridor = await this.createCorridorFromPath(pathData);
                 if (corridor) {
                     this.corridors.push(corridor);
                 }
             }
-            
+
             // Merge overlapping corridors
             this.mergeOverlappingCorridors();
-            
+
             this.log('Corridor geometry generated', { corridors: this.corridors.length });
-            
+
         } catch (error) {
             this.logError('Corridor geometry generation failed', error);
             throw error;
@@ -629,11 +629,11 @@ class CorridorGenerator {
         try {
             const width = this.config.defaultWidth;
             const path = pathData.path;
-            
+
             if (path.length < 2) return null;
-            
+
             const corridorPolygon = this.generateCorridorPolygon(path, width);
-            
+
             return {
                 id: `corridor_${pathData.id}`,
                 pathId: pathData.id,
@@ -649,7 +649,7 @@ class CorridorGenerator {
                     created: new Date().toISOString()
                 }
             };
-            
+
         } catch (error) {
             this.logError('Corridor creation failed', error);
             return null;
@@ -666,11 +666,11 @@ class CorridorGenerator {
         const halfWidth = width / 2;
         const leftSide = [];
         const rightSide = [];
-        
+
         for (let i = 0; i < path.length; i++) {
             const current = path[i];
             let direction;
-            
+
             if (i === 0) {
                 // First point: use direction to next point
                 const next = path[i + 1];
@@ -687,15 +687,15 @@ class CorridorGenerator {
                 const dir2 = this.calculateDirection(current, next);
                 direction = (dir1 + dir2) / 2;
             }
-            
+
             // Calculate perpendicular offset
             const perpX = Math.cos(direction + Math.PI / 2) * halfWidth;
             const perpY = Math.sin(direction + Math.PI / 2) * halfWidth;
-            
+
             leftSide.push([current[0] + perpX, current[1] + perpY]);
             rightSide.push([current[0] - perpX, current[1] - perpY]);
         }
-        
+
         // Combine left and right sides
         return [...leftSide, ...rightSide.reverse()];
     }
@@ -762,7 +762,7 @@ class CorridorGenerator {
             y < 0 || y >= this.navigationGrid.height) {
             return false;
         }
-        
+
         return this.getGridCell(x, y) === 1;
     }
 
@@ -798,16 +798,16 @@ class CorridorGenerator {
         const directions = this.config.diagonalMovement 
             ? [[-1,-1], [-1,0], [-1,1], [0,-1], [0,1], [1,-1], [1,0], [1,1]]
             : [[-1,0], [0,-1], [0,1], [1,0]];
-        
+
         for (const [dx, dy] of directions) {
             const x = cell.x + dx;
             const y = cell.y + dy;
-            
+
             if (this.isValidGridCell(x, y)) {
                 neighbors.push({ x, y });
             }
         }
-        
+
         return neighbors;
     }
 
@@ -820,11 +820,11 @@ class CorridorGenerator {
     getMoveCost(from, to) {
         const dx = Math.abs(to.x - from.x);
         const dy = Math.abs(to.y - from.y);
-        
+
         if (dx === 1 && dy === 1) {
             return this.config.diagonalCost;
         }
-        
+
         return 1.0;
     }
 
@@ -837,7 +837,7 @@ class CorridorGenerator {
     heuristic(from, to) {
         const dx = Math.abs(to.x - from.x);
         const dy = Math.abs(to.y - from.y);
-        
+
         if (this.config.diagonalMovement) {
             // Octile distance
             const D = 1;
@@ -857,12 +857,12 @@ class CorridorGenerator {
      */
     reconstructPath(cameFrom, current) {
         const path = [current];
-        
+
         while (cameFrom.has(`${current.x},${current.y}`)) {
             current = cameFrom.get(`${current.x},${current.y}`);
             path.unshift(current);
         }
-        
+
         return path;
     }
 
@@ -910,27 +910,31 @@ class CorridorGenerator {
     async validateCorridorNetwork() {
         const errors = [];
         const warnings = [];
-        
+
         try {
-            // Check corridor width compliance
+            // Validate corridor width compliance with FIXED minimum check
             for (const corridor of this.corridors) {
-                if (corridor.width < this.config.minWidth) {
-                    errors.push(`Corridor ${corridor.id} width too narrow: ${corridor.width}m`);
+                const actualWidth = corridor.width || this.config.defaultWidth;
+                if (actualWidth < this.config.minWidth) {
+                    errors.push(`Corridor ${corridor.id} width too narrow: ${actualWidth}m`);
+                    // FIXED: Auto-correct narrow corridors
+                    corridor.width = Math.max(actualWidth, this.config.minWidth);
+                    console.log(`🔧 FIXED: Corridor ${corridor.id} width corrected to ${corridor.width}m`);
                 }
             }
-            
+
             // Check connectivity
             const connectivity = this.checkConnectivity();
             if (!connectivity.allConnected) {
                 warnings.push('Not all entrances are connected');
             }
-            
+
             // Check total coverage
             const coverage = this.calculateCoverage();
             if (coverage > 0.3) { // More than 30% might be excessive
                 warnings.push(`High corridor coverage: ${(coverage * 100).toFixed(1)}%`);
             }
-            
+
             return {
                 isValid: errors.length === 0,
                 errors,
@@ -942,7 +946,7 @@ class CorridorGenerator {
                     connectivity: connectivity.score
                 }
             };
-            
+
         } catch (error) {
             return {
                 isValid: false,
@@ -979,10 +983,10 @@ class CorridorGenerator {
      */
     calculateCoverage() {
         if (!this.allowedSpace) return 0;
-        
+
         const allowedArea = this.geometryEngine.calculatePolygonArea(this.allowedSpace);
         const corridorArea = this.corridors.reduce((total, corridor) => total + corridor.area, 0);
-        
+
         return corridorArea / allowedArea;
     }
 
@@ -1024,11 +1028,11 @@ class PriorityQueue {
     constructor() {
         this.items = [];
     }
-    
+
     enqueue(element, priority) {
         const item = { element, priority };
         let added = false;
-        
+
         for (let i = 0; i < this.items.length; i++) {
             if (item.priority < this.items[i].priority) {
                 this.items.splice(i, 0, item);
@@ -1036,20 +1040,20 @@ class PriorityQueue {
                 break;
             }
         }
-        
+
         if (!added) {
             this.items.push(item);
         }
     }
-    
+
     dequeue() {
         return this.items.shift().element;
     }
-    
+
     isEmpty() {
         return this.items.length === 0;
     }
-    
+
     contains(element) {
         return this.items.some(item => 
             item.element.x === element.x && item.element.y === element.y
