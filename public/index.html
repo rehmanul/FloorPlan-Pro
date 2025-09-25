@@ -2465,16 +2465,75 @@
             updateStatus('Optimizing Layout', 'Applying advanced placement algorithms...');
             showNotification('Layout optimization in progress...', 'info');
 
-            // Simulate optimization
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            try {
+                // Initialize progress tracking
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += Math.random() * 15 + 5; // Random progress between 5-20%
+                    if (progress >= 95) progress = 95;
+                    setProgress(Math.min(progress, 95));
+                }, 300);
 
-            ilotEngine.optimizeLayout();
-            if (canvas && canvas.render) {
-                canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
+                // Perform actual optimization using the placement engine
+                const optimizationData = {
+                    floorPlan: currentFloorPlan,
+                    ilots: generatedIlots,
+                    options: {
+                        optimizationType: 'layout',
+                        iterations: 50,
+                        weights: {
+                            accessibility: 0.4,
+                            efficiency: 0.3,
+                            spacing: 0.3
+                        }
+                    }
+                };
+
+                // Call the advanced placement API for optimization
+                const response = await fetch('/api/advanced-placement', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(optimizationData)
+                });
+
+                clearInterval(progressInterval);
+                setProgress(100);
+
+                if (response.ok) {
+                    const result = await response.json();
+                    
+                    if (result.success && result.ilots) {
+                        // Update the generated îlots with optimized positions
+                        generatedIlots = result.ilots.map(ilot => ({
+                            ...ilot,
+                            optimized: true,
+                            efficiency: ilot.score || 0.85
+                        }));
+
+                        // Re-render the visualization
+                        if (canvas && canvas.render) {
+                            canvas.render(currentFloorPlan, generatedIlots, corridorNetwork);
+                        }
+
+                        // Update 3D visualization if available
+                        if (viewer && viewer.impl && generatedIlots.length > 0) {
+                            await visualizeIlotsOn3D(generatedIlots);
+                        }
+
+                        showNotification(`Layout optimized: ${generatedIlots.length} îlots repositioned for maximum efficiency`, 'success');
+                    } else {
+                        throw new Error(result.error || 'Optimization failed');
+                    }
+                } else {
+                    throw new Error(`Optimization request failed: ${response.statusText}`);
+                }
+
+            } catch (error) {
+                console.error('Layout optimization failed:', error);
+                showNotification(`Optimization failed: ${error.message}`, 'error');
+            } finally {
+                hideStatusOverlay();
             }
-
-            hideStatusOverlay();
-            showNotification('Layout optimized for maximum efficiency', 'success');
         }
 
         async function generateCorridors() {
