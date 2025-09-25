@@ -2317,7 +2317,6 @@
                         type: corridor.type,
                         width: corridor.width,
                         polygon: corridor.polygon,
-                        vertices: corridor.vertices,
                         connections: corridor.connections,
                         totalLength: corridor.totalLength,
                         area: corridor.area
@@ -3446,7 +3445,7 @@
 
             try {
                 const screenPos = viewer.impl.worldToClient(new THREE.Vector3(worldPos.x, worldPos.y, worldPos.z));
-                return { x: screenPos.x, y: screenPos.y };
+                return {x: screenPos.x, y: screenPos.y };
             } catch (error) {
                 console.log('World to screen conversion failed:', error);
                 return null;
@@ -3569,8 +3568,8 @@
             window.ilotOverlays.forEach(overlay => {
                 const screenPos = worldToScreen(overlay.worldPos);
                 if (screenPos) {
-                    overlay.element.style.left = (screenPos.x - overlay.element.offsetWidth/2) + 'px';
-                    overlay.element.style.top = (screenPos.y - overlay.element.offsetHeight/2) + 'px';
+                    overlay.element.style.left = `${screenPos.x - overlay.element.offsetWidth/2}px`;
+                    overlay.element.style.top = `${screenPos.y - overlay.element.offsetHeight/2}px`;
                 }
             });
         }
@@ -3661,25 +3660,30 @@
                             return;
                         }
 
-                        // Load the viewable into the viewer
                         viewer.loadDocumentNode(doc, viewables).then(async function(result) {
                             console.log('🎉 Model loaded successfully!');
 
-                            // Initialize viewer overlay system
-                            if (floorPlanController) {
-                                const overlaySuccess = await floorPlanController.initializeViewer(viewer);
-                                if (overlaySuccess) {
-                                    console.log('✅ Viewer overlay system initialized');
+                            // Initialize MaterialManager bypass system
+                            try {
+                                if (window.fixedUnifiedController) {
+                                    await window.fixedUnifiedController.initializeViewer(viewer);
+                                    console.log('✅ BYPASS: MaterialManager bypass system initialized');
 
                                     // Sync any existing elements to viewer
                                     if (generatedIlots.length > 0) {
-                                        await floorPlanController.addIlots(generatedIlots);
+                                        await window.fixedUnifiedController.addIlots(generatedIlots);
                                     }
-                                    if (corridorNetwork.length > 0) {
-                                        await floorPlanController.addCorridors(corridorNetwork);
+                                } else {
+                                    console.log('⚠️ Bypass system not ready, initializing...');
+                                    await window.initializeBypassSystem();
+                                    if (window.fixedUnifiedController) {
+                                        await window.fixedUnifiedController.initializeViewer(viewer);
                                     }
                                 }
+                            } catch (bypassError) {
+                                console.warn('⚠️ BYPASS: MaterialManager bypass failed, viewer-only mode:', bypassError.message);
                             }
+                            // --- END OF BYPASS SYSTEM INTEGRATION ---
 
                             // Automatically fit to view
                             // await fitToView(); // This needs to be called after the viewer is fully loaded and ready
